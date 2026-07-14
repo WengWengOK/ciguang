@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>词光 - 考研英语</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="brand-icon">🏛️</span>
+            <span class="brand-text">词光</span>
+        </div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-page="collection">
+                <span>🎨</span> 收藏室
+            </button>
+            <button class="nav-tab" data-page="practice">
+                <span>✏️</span> 例句练习
+            </button>
+            <button class="nav-tab" data-page="reading">
+                <span>📖</span> 阅读练习
+            </button>
+            <button class="nav-tab" data-page="translation">
+                <span>🌐</span> 翻译练习
+            </button>
+            <button class="nav-tab" data-page="cloze">
+                <span>📝</span> 选词填空
+            </button>
+            <button class="nav-tab" data-page="writing">
+                <span>✍️</span> 作文练习
+            </button>
+            <button class="nav-tab" data-page="memory">
+                <span>🧠</span> 记忆
+            </button>
+            <button class="nav-tab" data-page="saved">
+                <span>💾</span> 已保存
+            </button>
+            <button class="nav-tab" data-page="wrong">
+                <span>❌</span> 错题本
+            </button>
+            <button class="nav-tab" data-page="stats">
+                <span>📊</span> 统计
+            </button>
+        </div>
+        <div class="nav-info">
+            <span class="total-words">📚 0 个单词</span>
+            <div class="auth-section" id="auth-section">
+                <button class="btn-login" id="btn-login" onclick="showLoginModal()">登录</button>
+                <div class="user-info hidden" id="user-info">
+                    <span id="user-nickname">用户</span>
+                    <button class="btn-logout" onclick="logout()">退出</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 登录/注册模态框 -->
+    <div class="modal-overlay hidden" id="auth-modal">
+        <div class="modal auth-modal">
+            <div class="modal-header">
+                <h3 id="auth-title">用户登录</h3>
+                <button class="close-btn" onclick="closeAuthModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="auth-username" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="auth-password" placeholder="请输入密码（至少6位）">
+                </div>
+                <div class="form-group hidden" id="nickname-group">
+                    <label>昵称</label>
+                    <input type="text" id="auth-nickname" placeholder="请输入昵称（可选）">
+                </div>
+                <div class="auth-error hidden" id="auth-error"></div>
+                <button class="btn-primary btn-block" id="auth-submit-btn" onclick="handleAuthSubmit()">登录</button>
+                <div class="auth-switch">
+                    <span id="auth-switch-text">还没有账号？</span>
+                    <a href="javascript:void(0)" id="auth-switch-link" onclick="toggleAuthMode()">立即注册</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+        <!-- 收藏室页面 -->
+        <section id="collection-page" class="page active">
+            <div class="collection-header">
+                <h1>🏛️ 我的词光</h1>
+                <p class="subtitle">每个单词都是独一无二的收藏品，通过练习让它们升级发光吧！</p>
+                <div class="legend">
+                    <div class="legend-item">
+                        <span class="legend-dot level-0"></span>
+                        <span>绿色 (0-2次)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot level-1"></span>
+                        <span>蓝色 (3-5次)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot level-2"></span>
+                        <span>紫色 (6-10次)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot level-3"></span>
+                        <span>金色 (11-20次)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot level-4"></span>
+                        <span>红色 (21次+)</span>
+                    </div>
+                </div>
+            </div>
+            <div class="letter-nav" id="letter-nav">
+                <!-- 字母导航 -->
+            </div>
+            <div class="collection-grid" id="collection-grid">
+                <!-- 单词卡片将在这里渲染 -->
+            </div>
+            <div class="loading-indicator" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <span>加载中...</span>
+            </div>
+        </section>
+
+        <!-- 翻译练习页面 -->
+        <section id="practice-page" class="page">
+            <div class="practice-container">
+                <div class="practice-header">
+                    <h1>✏️ 例句练习</h1>
+                    <p class="subtitle">根据例句写出中文翻译，AI将为你评判</p>
+                    <div class="mode-selector">
+                        <span class="mode-label">📋 出题模式：</span>
+                        <div class="mode-options">
+                            <button class="mode-btn active" data-mode="sequential" title="按单词表顺序出题">🔢 顺序</button>
+                            <button class="mode-btn" data-mode="random" title="随机打乱顺序出题">🎲 乱序</button>
+                            <button class="mode-btn" data-mode="letter" title="按指定字母开头出题">🔤 字母</button>
+                        </div>
+                        <div class="letter-filter" id="letter-filter" style="display: none;">
+                            <span class="letter-filter-label">选择首字母：</span>
+                            <div class="letter-filter-options" id="letter-filter-options">
+                                <!-- 字母选项由JS生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="practice-card" id="practice-card">
+                    <div class="timer-bar" id="practice-timer">⏱️ 00:00</div>
+                    <div class="word-display">
+                        <div class="word-main">
+                            <span class="word-badge" id="practice-word">Word</span>
+                            <button class="btn-speak" id="btn-speak-word" title="朗读单词">🔊</button>
+                        </div>
+                        <span class="word-phonetic" id="practice-phonetic"></span>
+                        <span class="word-level" id="practice-level">Level 0</span>
+                    </div>
+                    <div class="example-section">
+                        <div class="example-header">
+                            <label>📖 例句</label>
+                            <div class="example-actions">
+                                <button class="btn-speak" id="btn-speak-example" title="朗读例句">🔊 朗读</button>
+                                <button class="btn-refresh-example" id="btn-refresh-example" title="换一个例句">🔄 刷新例句</button>
+                            </div>
+                        </div>
+                        <p class="example-sentence" id="example-sentence">Loading...</p>
+                    </div>
+                    <div class="translation-section">
+                        <label>✍️ 你的翻译</label>
+                        <textarea id="user-translation" placeholder="请输入中文翻译..."></textarea>
+                    </div>
+                    <div class="hint-toggle-row">
+                        <button class="btn-hint-toggle" id="btn-show-hint">💡 显示单词提示</button>
+                        <button class="btn-answer-toggle" id="btn-show-answer">📖 显示标准翻译</button>
+                    </div>
+                    <div class="answer-hint" id="answer-hint" style="display: none;">
+                        <span class="hint-label">💡 单词提示：</span>
+                        <span class="hint-word" id="hint-word"></span>
+                        <span class="hint-meaning" id="hint-meaning"></span>
+                    </div>
+                    <div class="standard-answer" id="standard-answer" style="display: none;">
+                        <span class="answer-label">📖 标准翻译：</span>
+                        <span class="answer-text" id="standard-answer-text"></span>
+                    </div>
+                    <div class="practice-actions">
+                        <button class="btn-skip" id="btn-skip">⏭️ 跳过</button>
+                        <button class="btn-submit" id="btn-submit">✅ 提交翻译</button>
+                    </div>
+                </div>
+                <div class="ai-evaluation" id="ai-evaluation" style="display: none;">
+                    <div class="evaluation-header">
+                        <span class="ai-icon">🤖</span>
+                        <span>AI 评判结果</span>
+                    </div>
+                    <div class="evaluation-content" id="evaluation-content"></div>
+                    <div class="evaluation-actions">
+                        <button class="btn-next" id="btn-next">下一题 ➡️</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 阅读练习页面 -->
+        <section id="reading-page" class="page">
+            <div class="reading-container">
+                <div class="reading-header">
+                    <div class="reading-title-group">
+                        <h1>📖 阅读练习</h1>
+                        <p class="subtitle">阅读短文并回答问题，提升阅读理解能力</p>
+                    </div>
+                    <div class="reading-controls">
+                        <div class="reading-mode-selector">
+                            <span class="mode-label">📋 难度选择：</span>
+                            <div class="mode-options">
+                                <button class="mode-btn active" data-reading-mode="easy" title="简单难度">🟢 简单</button>
+                                <button class="mode-btn" data-reading-mode="medium" title="中等难度">🟡 中等</button>
+                                <button class="mode-btn" data-reading-mode="hard" title="困难难度">🔴 困难</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 题目来源切换区域 -->
+                    <div class="reading-source-switch">
+                        <div class="source-tabs">
+                            <button class="source-tab active" data-reading-source="random">📚 题库随机</button>
+                            <button class="source-tab" data-reading-source="custom">✏️ 自定义输入</button>
+                            <button class="source-tab" data-reading-source="photo">📷 拍照上传</button>
+                        </div>
+                        <div class="source-panel active" id="reading-panel-random">
+                            <div class="reading-generate-options">
+                                <button class="btn-generate-ai" id="btn-generate-ai-reading">🤖 AI生成文章</button>
+                                <span class="generate-hint">AI根据主题生成全新阅读文章，需后端服务</span>
+                            </div>
+                        </div>
+                        <div class="source-panel" id="reading-panel-custom">
+                            <textarea id="reading-custom-text" class="source-custom-textarea" placeholder="请粘贴英文文章内容，将自动生成阅读理解题目..." rows="8"></textarea>
+                            <div class="source-custom-actions">
+                                <span class="source-custom-count">已输入 <span id="reading-custom-word-count">0</span> 词</span>
+                                <button class="btn-generate-custom" id="btn-start-custom-reading">📝 开始练习</button>
+                            </div>
+                        </div>
+                        <div class="source-panel" id="reading-panel-photo">
+                            <div class="source-photo-section">
+                                <!-- 拍照区域 -->
+                                <div class="camera-area">
+                                    <video id="reading-camera-video" autoplay playsinline style="display: none;"></video>
+                                    <canvas id="reading-camera-canvas" style="display: none;"></canvas>
+                                    <div class="camera-placeholder" id="reading-camera-placeholder">
+                                        <div class="camera-icon">📷</div>
+                                        <p>点击"开启相机"拍摄文章照片</p>
+                                        <button class="btn-camera" id="reading-btn-start-camera">开启相机</button>
+                                    </div>
+                                    <div class="camera-controls" id="reading-camera-controls" style="display: none;">
+                                        <button class="btn-camera" id="reading-btn-take-photo">📸 拍照</button>
+                                        <button class="btn-camera secondary" id="reading-btn-stop-camera">停止</button>
+                                    </div>
+                                    <img id="reading-camera-preview" class="camera-preview" style="display: none;">
+                                </div>
+                                <!-- 文件上传区域 -->
+                                <div class="file-upload-area" id="reading-file-upload-area">
+                                    <div class="upload-icon">📎</div>
+                                    <p>拖拽文件到此处，或点击上传</p>
+                                    <input type="file" id="reading-file-input" accept=".txt,.md,.png,.jpg,.jpeg" hidden>
+                                    <button class="btn-upload" id="reading-btn-upload-file">选择文件</button>
+                                </div>
+                                <div class="source-photo-hint">
+                                    <small>支持 .txt、.md 文本文件，或 .png、.jpg 图片（自动OCR识别文字后进入练习）</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="reading-card" id="reading-card">
+                    <div class="timer-bar" id="reading-timer">⏱️ 00:00</div>
+                    <div class="passage-section" id="passage-section">
+                        <div class="passage-header">
+                            <span class="passage-title" id="passage-title">Passage Title</span>
+                            <div class="passage-header-right">
+                                <span class="passage-info" id="passage-info">约 200 词</span>
+                                <button class="btn-toggle-cn" id="btn-toggle-cn" title="显示/隐藏中文翻译">🇨🇳 翻译</button>
+                            </div>
+                        </div>
+                        <div class="passage-content" id="passage-content">
+                            Loading passage...
+                        </div>
+                    </div>
+                    <div class="questions-section" id="questions-section">
+                        <h3>📝 阅读理解题目</h3>
+                        <div class="questions-list" id="questions-list">
+                            <!-- 题目题干将在这里渲染 -->
+                        </div>
+                    </div>
+                    <!-- 底部固定悬浮导航栏 -->
+                    <div class="reading-nav-bar" id="reading-nav-bar">
+                        <div class="reading-nav-inner">
+                            <div class="reading-nav-top" id="reading-nav-top">
+                                <div class="reading-nav-title">题目导航</div>
+                                <div class="reading-nav-items" id="reading-nav-items">
+                                    <!-- 5个题目导航按钮 -->
+                                </div>
+                                <div class="reading-nav-controls">
+                                    <button class="reading-nav-toggle" id="reading-nav-toggle" title="收起/展开选项">⬇️</button>
+                                    <button class="btn-submit" id="btn-submit-reading">✅ 提交答案</button>
+                                </div>
+                            </div>
+                            <div class="reading-nav-options" id="reading-nav-options">
+                                <!-- 当前题目的选项将在这里渲染 -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="reading-actions">
+                        <button class="btn-skip" id="btn-new-passage">🔄 换一篇文章</button>
+                        <button class="btn-action" id="btn-save-reading" title="保存练习">💾 保存练习</button>
+                        <button class="btn-action" id="btn-download-reading" title="下载题目">💾 下载题目</button>
+                    </div>
+                </div>
+                <div class="reading-result" id="reading-result" style="display: none;">
+                    <div class="result-header">
+                        <span>📊 答题结果</span>
+                    </div>
+                    <div class="result-content" id="result-content"></div>
+                    <div class="result-actions">
+                        <button class="btn-next" id="btn-next-passage">下一篇 ➡️</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 翻译练习页面 -->
+        <section id="translation-page" class="page">
+            <div class="translation-container">
+                <div class="translation-header">
+                    <h1>🌐 翻译练习</h1>
+                    <p class="subtitle">中英对照翻译训练，掌握考研高频翻译素材</p>
+                    <div class="translation-topic-selector">
+                        <span class="mode-label">📋 主题选择：</span>
+                        <div class="mode-options">
+                            <button class="mode-btn active" data-translation-topic="culture" title="中国传统文化">🏮 中国传统文化</button>
+                            <button class="mode-btn" data-translation-topic="technology" title="现代科技发展">🚀 现代科技发展</button>
+                            <button class="mode-btn" data-translation-topic="society" title="社会发展与科普">📊 社会发展</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="translation-card" id="translation-card">
+                    <div class="timer-bar" id="translation-timer">⏱️ 00:00</div>
+                    <div class="translation-passage" id="translation-passage">
+                        <!-- 翻译内容将在这里渲染 -->
+                    </div>
+                    <div class="upload-tabs">
+                        <button class="upload-tab active" data-upload-tab="file">📄 文件上传</button>
+                        <button class="upload-tab" data-upload-tab="camera">📷 拍照上传</button>
+                    </div>
+                    <div class="upload-panel active" id="upload-panel-file">
+                        <div class="file-upload-area" id="file-upload-area">
+                            <div class="file-upload-icon">📄</div>
+                            <div class="file-upload-text">
+                                <strong>上传翻译文件</strong>
+                                <span>拖拽文件到此处，或点击选择文件</span>
+                            </div>
+                            <input type="file" id="file-upload-input" accept=".txt,.md" style="display: none;">
+                            <button class="btn-action" id="btn-select-file">选择文件</button>
+                        </div>
+                        <div class="file-upload-info">
+                            <small>支持 .txt 和 .md 格式，文件内容应为当前题目的英文翻译</small>
+                        </div>
+                    </div>
+                    <div class="upload-panel" id="upload-panel-camera">
+                        <div class="camera-section" id="camera-section">
+                            <div class="camera-preview-container">
+                                <video id="camera-video" autoplay playsinline style="display: none;"></video>
+                                <canvas id="camera-canvas" style="display: none;"></canvas>
+                                <img id="camera-photo" style="display: none; max-width: 100%; border-radius: 8px;">
+                                <div class="camera-placeholder" id="camera-placeholder">
+                                    <div class="camera-icon">📷</div>
+                                    <div class="camera-text">点击"打开摄像头"开始拍照</div>
+                                </div>
+                            </div>
+                            <div class="camera-controls">
+                                <button class="btn-action" id="btn-camera-start">📷 打开摄像头</button>
+                                <button class="btn-action" id="btn-camera-snap" style="display: none;">📸 拍照</button>
+                                <button class="btn-action" id="btn-camera-retake" style="display: none;">🔄 重拍</button>
+                                <button class="btn-action btn-primary" id="btn-camera-ocr" style="display: none;">🔍 识别并评分</button>
+                            </div>
+                            <div class="camera-status" id="camera-status"></div>
+                        </div>
+                    </div>
+                <div class="translation-input-section">
+                        <h3>✍️ 请翻译以下句子</h3>
+                        <div class="translation-sentences" id="translation-sentences">
+                            <!-- 翻译句子将在这里渲染 -->
+                        </div>
+                        <div class="translation-actions">
+                            <button class="btn-skip" id="btn-new-translation">🔄 换一篇</button>
+                            <button class="btn-action" id="btn-save-translation" title="保存练习">💾 保存练习</button>
+                            <button class="btn-action" id="btn-download-translation" title="下载题目">💾 下载题目</button>
+                            <button class="btn-submit" id="btn-submit-translation">✅ 提交翻译</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="translation-result" id="translation-result" style="display: none;">
+                    <div class="result-header">
+                        <span>📊 翻译结果</span>
+                    </div>
+                    <div class="result-content" id="translation-result-content"></div>
+                    <div class="result-actions">
+                        <button class="btn-next" id="btn-next-translation">下一篇 ➡️</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 选词填空页面 -->
+        <section id="cloze-page" class="page">
+            <div class="cloze-container">
+                <div class="cloze-header-section">
+                    <h1>📝 选词填空</h1>
+                    <p class="subtitle">阅读短文并选择正确单词填空，提升词汇运用能力</p>
+                    <div class="difficulty-selector">
+                        <span class="mode-label">🎯 难度选择：</span>
+                        <div class="mode-options">
+                            <button class="mode-btn active" data-cloze-difficulty="easy">🟢 简单</button>
+                            <button class="mode-btn" data-cloze-difficulty="medium">🟡 中等</button>
+                            <button class="mode-btn" data-cloze-difficulty="hard">🔴 困难</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- 题目来源切换区域 -->
+                <div class="cloze-source-switch">
+                    <div class="cloze-source-tabs">
+                        <button class="cloze-source-tab active" data-cloze-source="random">📚 题库随机</button>
+                        <button class="cloze-source-tab" data-cloze-source="custom">✏️ 自定义输入</button>
+                    </div>
+                    <div class="cloze-source-panel active" id="cloze-panel-random">
+                        <div class="cloze-source-info">从题库中随机选取文章，根据难度生成选词填空练习</div>
+                    </div>
+                    <div class="cloze-source-panel" id="cloze-panel-custom">
+                        <textarea id="cloze-custom-text" class="cloze-custom-textarea" placeholder="请粘贴包含要考察单词的英文文章..." rows="6"></textarea>
+                        <input type="text" id="cloze-custom-words" class="cloze-custom-input" placeholder="输入要挖空的单词，用逗号分隔，如：resource, biodiversity, critical">
+                        <button class="btn-generate-custom" id="btn-generate-custom-cloze">🎯 生成练习</button>
+                    </div>
+                </div>
+                <div class="cloze-card" id="cloze-card">
+                    <div class="timer-bar" id="cloze-timer">⏱️ 00:00</div>
+                    <div class="cloze-passage-header">
+                        <span class="cloze-title" id="cloze-title">Title</span>
+                        <div class="cloze-header-right">
+                            <span class="cloze-info" id="cloze-info">10 空</span>
+                            <button class="btn-toggle-cn" id="btn-cloze-toggle-cn" title="显示/隐藏中文翻译">🇨🇳 翻译</button>
+                        </div>
+                    </div>
+                    <div class="cloze-content" id="cloze-content">
+                        <!-- 文章将在这里渲染，空白处用 [1], [2] 等标记 -->
+                    </div>
+                    <div class="cloze-cn-content" id="cloze-cn-content" style="display: none;">
+                        <!-- 中文翻译将在这里渲染 -->
+                    </div>
+                    <div class="cloze-options-section" id="cloze-options-section">
+                        <h3>📝 选择正确答案</h3>
+                        <div class="cloze-options-list" id="cloze-options-list">
+                            <!-- 10组选项将在这里渲染 -->
+                        </div>
+                    </div>
+                    <!-- 底部固定悬浮导航栏 -->
+                    <div class="cloze-nav-bar" id="cloze-nav-bar">
+                        <div class="cloze-nav-inner">
+                            <div class="cloze-nav-top" id="cloze-nav-top">
+                                <div class="cloze-nav-title">题目导航</div>
+                                <div class="cloze-nav-items" id="cloze-nav-items">
+                                    <!-- 10个空白导航按钮 -->
+                                </div>
+                                <div class="cloze-nav-controls">
+                                    <button class="cloze-nav-toggle" id="cloze-nav-toggle" title="收起/展开选项">⬇️</button>
+                                    <button class="btn-submit" id="btn-submit-cloze">✅ 提交答案</button>
+                                </div>
+                            </div>
+                            <div class="cloze-nav-options" id="cloze-nav-options" style="">
+                                <!-- 当前空白的选项将在这里渲染 -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cloze-actions">
+                        <button class="btn-skip" id="btn-new-cloze">🔄 换一篇</button>
+                        <button class="btn-action" id="btn-download-cloze" title="下载题目">💾 下载题目</button>
+                    </div>
+                </div>
+                <div class="cloze-result" id="cloze-result" style="display: none;">
+                    <div class="result-header">
+                        <span>📊 答题结果</span>
+                    </div>
+                    <div class="result-content" id="cloze-result-content"></div>
+                    <div class="result-actions">
+                        <button class="btn-next" id="btn-next-cloze">下一篇 ➡️</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 进度统计页面 -->
+        <section id="memory-page" class="page">
+            <div class="memory-container">
+                <div class="memory-header-section">
+                    <h1>🧠 单词记忆</h1>
+                    <p class="subtitle">检测单词记忆，记得的写出意思，不记得的查看释义</p>
+                    <div class="mode-selector">
+                        <span class="mode-label">🎯 模式选择：</span>
+                        <div class="mode-options">
+                            <button class="mode-btn active" data-memory-mode="all">🔢 全部</button>
+                            <button class="mode-btn" data-memory-mode="random">🎲 乱序</button>
+                            <button class="mode-btn" data-memory-mode="letter">🔤 字母</button>
+                        </div>
+                    </div>
+                    <div class="letter-selector" id="memory-letter-selector" style="display: none;">
+                        <span class="mode-label">🔤 选择字母：</span>
+                        <div class="letter-options" id="memory-letter-options"></div>
+                    </div>
+                </div>
+                <div class="memory-content-area">
+                    <!-- Step 1: Show word and ask remember/not remember -->
+                    <div class="memory-card" id="memory-step1">
+                        <div class="timer-bar" id="memory-timer">⏱️ 00:00</div>
+                        <div class="memory-word-display">
+                            <span class="memory-word" id="memory-word">Word</span>
+                            <button class="btn-speak" id="btn-memory-speak" title="朗读单词">🔊</button>
+                        </div>
+                        <div class="memory-question">
+                            <p>你还记得这个单词的意思吗？</p>
+                        </div>
+                        <div class="memory-actions">
+                            <button class="btn-memory btn-remember" id="btn-remember">✅ 记得</button>
+                            <button class="btn-memory btn-forget" id="btn-forget">❌ 不记得</button>
+                        </div>
+                    </div>
+                    <!-- Step 2a: User remembers, ask to write meaning -->
+                    <div class="memory-card" id="memory-step2-write" style="display: none;">
+                        <div class="timer-bar" id="memory-timer-2">⏱️ 00:00</div>
+                        <div class="memory-word-display">
+                            <span class="memory-word" id="memory-word-write">Word</span>
+                            <button class="btn-speak" id="btn-memory-speak-write" title="朗读单词">🔊</button>
+                        </div>
+                        <div class="memory-input-section">
+                            <p>请写出这个单词的中文意思：</p>
+                            <input type="text" class="memory-input" id="memory-meaning-input" placeholder="请输入中文意思..." autocomplete="off">
+                        </div>
+                        <div class="memory-actions">
+                            <button class="btn-action" id="btn-memory-skip">⏭️ 跳过</button>
+                            <button class="btn-action btn-primary" id="btn-memory-submit">✅ 提交</button>
+                        </div>
+                    </div>
+                    <!-- Step 2b: User doesn't remember, show meaning -->
+                    <div class="memory-card" id="memory-step2-show" style="display: none;">
+                        <div class="memory-word-display">
+                            <span class="memory-word" id="memory-word-show">Word</span>
+                        </div>
+                        <div class="memory-meaning-reveal">
+                            <div class="memory-meaning-label">📖 单词释义</div>
+                            <div class="memory-meaning-text" id="memory-meaning-text"></div>
+                            <div class="memory-example" id="memory-example"></div>
+                        </div>
+                        <div class="memory-actions">
+                            <button class="btn-action btn-primary" id="btn-memory-next-forget">下一词 ➡️</button>
+                        </div>
+                    </div>
+                    <!-- Step 3: Result -->
+                    <div class="memory-card" id="memory-step3-result" style="display: none;">
+                        <div id="memory-result-content"></div>
+                        <div class="memory-actions">
+                            <button class="btn-action btn-primary" id="btn-memory-next">下一词 ➡️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="writing-page" class="page">
+            <div class="writing-container">
+                <h1>✍️ 作文练习</h1>
+                <p class="subtitle">AI生成作文题目，支持拍照上传和智能评分</p>
+
+                <div class="writing-toolbar">
+                    <div class="writing-options">
+                        <label>主题：</label>
+                        <select id="writing-topic">
+                            <option value="social">社会热点</option>
+                            <option value="education">教育学习</option>
+                            <option value="technology">科技发展</option>
+                            <option value="environment">环境保护</option>
+                            <option value="culture">文化传承</option>
+                            <option value="economy">经济发展</option>
+                            <option value="health">健康生活</option>
+                            <option value="career">职业规划</option>
+                        </select>
+                        <label>难度：</label>
+                        <select id="writing-difficulty">
+                            <option value="easy">简单（150词）</option>
+                            <option value="medium" selected>中等（200词）</option>
+                            <option value="hard">困难（250词）</option>
+                        </select>
+                        <button class="btn-generate" id="btn-generate-writing">🎯 生成题目</button>
+                    </div>
+                </div>
+
+                <div class="writing-content" id="writing-content" style="display: none;">
+                    <div class="writing-prompt-card">
+                        <h3 id="writing-title">题目标题</h3>
+                        <div class="writing-prompt" id="writing-prompt"></div>
+                        <div class="writing-meta">
+                            <span id="writing-word-limit">字数限制：200词</span>
+                            <span id="writing-difficulty-tag">难度：中等</span>
+                        </div>
+                        <div class="writing-hints" id="writing-hints"></div>
+                        <div class="writing-outline" id="writing-outline"></div>
+                    </div>
+
+                    <div class="writing-input-section">
+                        <div class="writing-input-tabs">
+                            <button class="writing-tab active" data-input="keyboard">⌨️ 键盘输入</button>
+                            <button class="writing-tab" data-input="camera">📷 拍照上传</button>
+                            <button class="writing-tab" data-input="file">📎 文件上传</button>
+                        </div>
+
+                        <div class="writing-input-panel active" id="panel-keyboard">
+                            <textarea id="writing-textarea" placeholder="请根据题目要求完成作文..." rows="15"></textarea>
+                            <div class="word-count">已输入 <span id="word-count">0</span> 词</div>
+                        </div>
+
+                        <div class="writing-input-panel" id="panel-camera">
+                            <div class="camera-area">
+                                <video id="camera-video" autoplay playsinline style="display: none;"></video>
+                                <canvas id="camera-canvas" style="display: none;"></canvas>
+                                <div class="camera-placeholder" id="camera-placeholder">
+                                    <div class="camera-icon">📷</div>
+                                    <p>点击"开启相机"拍摄作文照片</p>
+                                    <button class="btn-camera" id="btn-start-camera">开启相机</button>
+                                </div>
+                                <div class="camera-controls" id="camera-controls" style="display: none;">
+                                    <button class="btn-camera" id="btn-take-photo">📸 拍照</button>
+                                    <button class="btn-camera secondary" id="btn-stop-camera">停止</button>
+                                </div>
+                                <img id="camera-preview" class="camera-preview" style="display: none;">
+                            </div>
+                            <div class="ocr-result" id="ocr-result" style="display: none;">
+                                <h4>识别结果：</h4>
+                                <textarea id="ocr-text" rows="8"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="writing-input-panel" id="panel-file">
+                            <div class="file-upload-area" id="file-upload-area">
+                                <div class="upload-icon">📎</div>
+                                <p>拖拽文件到此处，或点击上传</p>
+                                <input type="file" id="writing-file-input" accept=".txt,.md,.doc,.docx,.pdf,.png,.jpg,.jpeg" hidden>
+                                <button class="btn-upload" id="btn-upload-file">选择文件</button>
+                            </div>
+                            <div class="file-result" id="file-result" style="display: none;">
+                                <h4>文件内容：</h4>
+                                <textarea id="file-text" rows="8"></textarea>
+                            </div>
+                        </div>
+
+                        <button class="btn-submit-writing" id="btn-submit-writing">🚀 提交评分</button>
+                    </div>
+                </div>
+
+                <div class="writing-evaluation" id="writing-evaluation" style="display: none;">
+                    <div class="score-card">
+                        <div class="total-score">
+                            <span class="score-number" id="total-score">--</span>
+                            <span class="score-label">总分</span>
+                        </div>
+                        <div class="score-details">
+                            <div class="score-item">
+                                <span class="score-label">内容</span>
+                                <div class="score-bar"><div class="score-fill" id="content-score-bar"></div></div>
+                                <span class="score-value" id="content-score">--</span>
+                            </div>
+                            <div class="score-item">
+                                <span class="score-label">语言</span>
+                                <div class="score-bar"><div class="score-fill" id="language-score-bar"></div></div>
+                                <span class="score-value" id="language-score">--</span>
+                            </div>
+                            <div class="score-item">
+                                <span class="score-label">结构</span>
+                                <div class="score-bar"><div class="score-fill" id="structure-score-bar"></div></div>
+                                <span class="score-value" id="structure-score">--</span>
+                            </div>
+                            <div class="score-item">
+                                <span class="score-label">词汇</span>
+                                <div class="score-bar"><div class="score-fill" id="vocabulary-score-bar"></div></div>
+                                <span class="score-value" id="vocabulary-score">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="evaluation-comment">
+                        <h4>📋 总体评价</h4>
+                        <p id="overall-comment"></p>
+                    </div>
+
+                    <div class="evaluation-sections">
+                        <div class="eval-section">
+                            <h4>✅ 优点</h4>
+                            <ul id="strengths-list"></ul>
+                        </div>
+                        <div class="eval-section">
+                            <h4>⚠️ 不足</h4>
+                            <ul id="weaknesses-list"></ul>
+                        </div>
+                        <div class="eval-section">
+                            <h4>💡 建议</h4>
+                            <ul id="suggestions-list"></ul>
+                        </div>
+                    </div>
+
+                    <div class="grammar-errors" id="grammar-errors-section" style="display: none;">
+                        <h4>🔍 语法错误</h4>
+                        <table class="grammar-table">
+                            <thead>
+                                <tr><th>原文</th><th>修正</th><th>说明</th><th>类型</th></tr>
+                            </thead>
+                            <tbody id="grammar-errors-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="improved-version">
+                        <h4>✨ 改进版本</h4>
+                        <div class="improved-text" id="improved-text"></div>
+                    </div>
+
+                    <div class="writing-actions">
+                        <button class="btn-action" id="btn-writing-again">再写一篇</button>
+                        <button class="btn-action btn-primary" id="btn-writing-save">保存练习</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="wrong-page" class="page">
+            <div class="wrong-container">
+                <div class="wrong-header">
+                    <h1>❌ 错题本</h1>
+                    <p class="subtitle">记录练习中的错题，方便回顾巩固薄弱环节</p>
+                    <div class="wrong-filter">
+                        <button class="wrong-filter-btn active" data-filter="all">全部</button>
+                        <button class="wrong-filter-btn" data-filter="practice">例句练习</button>
+                        <button class="wrong-filter-btn" data-filter="reading">阅读练习</button>
+                        <button class="wrong-filter-btn" data-filter="cloze">选词填空</button>
+                        <button class="wrong-filter-btn" data-filter="memory">单词记忆</button>
+                    </div>
+                    <div class="wrong-actions">
+                        <button class="btn-action" id="btn-clear-wrong">🗑️ 清空错题本</button>
+                    </div>
+                </div>
+                <div class="wrong-stats" id="wrong-stats">
+                    <div class="wrong-stat-card">
+                        <span class="wrong-stat-number" id="wrong-total">0</span>
+                        <span class="wrong-stat-label">总错题数</span>
+                    </div>
+                    <div class="wrong-stat-card">
+                        <span class="wrong-stat-number" id="wrong-practice-count">0</span>
+                        <span class="wrong-stat-label">例句错题</span>
+                    </div>
+                    <div class="wrong-stat-card">
+                        <span class="wrong-stat-number" id="wrong-reading-count">0</span>
+                        <span class="wrong-stat-label">阅读错题</span>
+                    </div>
+                    <div class="wrong-stat-card">
+                        <span class="wrong-stat-number" id="wrong-cloze-count">0</span>
+                        <span class="wrong-stat-label">选词错题</span>
+                    </div>
+                    <div class="wrong-stat-card">
+                        <span class="wrong-stat-number" id="wrong-memory-count">0</span>
+                        <span class="wrong-stat-label">记忆错题</span>
+                    </div>
+                </div>
+                <div class="wrong-list" id="wrong-list">
+                    <div class="wrong-empty" id="wrong-empty">
+                        <div class="empty-icon">🎉</div>
+                        <p>暂无错题，继续保持！</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="saved-page" class="page">
+            <div class="saved-container">
+                <h1>💾 保存的练习</h1>
+                <p class="subtitle">收藏您想要复习的翻译练习和阅读练习</p>
+                
+                <div class="saved-tabs">
+                    <button class="saved-tab active" data-saved-type="all">全部</button>
+                    <button class="saved-tab" data-saved-type="translation">🌐 翻译练习</button>
+                    <button class="saved-tab" data-saved-type="reading">📖 阅读练习</button>
+                </div>
+                
+                <div class="saved-list" id="saved-list">
+                    <!-- 保存的练习将在这里渲染 -->
+                </div>
+                
+                <div class="saved-empty" id="saved-empty" style="display: none;">
+                    <div class="empty-icon">📭</div>
+                    <p>暂无保存的练习</p>
+                    <p class="empty-hint">在翻译练习或阅读练习中点击"💾 保存练习"按钮即可收藏</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="stats-page" class="page">
+            <div class="stats-container">
+                <div class="diagnosis-panel" id="diagnosis-panel">
+                    <h2>🎯 学情诊断</h2>
+                    <div class="diagnosis-overview">
+                        <div class="diagnosis-score-ring">
+                            <div class="ring-value" id="diagnosis-overall-score">--</div>
+                            <div class="ring-label">综合评分</div>
+                        </div>
+                        <div class="diagnosis-summary" id="diagnosis-summary">
+                            <p>开始练习后将生成学情诊断报告</p>
+                        </div>
+                    </div>
+                    <div class="diagnosis-details" id="diagnosis-details">
+                        <!-- 动态渲染 -->
+                    </div>
+                </div>
+                <h1>📊 学习进度</h1>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📚</div>
+                        <div class="stat-value" id="stat-total">0</div>
+                        <div class="stat-label">总单词数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-value" id="stat-correct">0</div>
+                        <div class="stat-label">总答对次数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-value" id="stat-accuracy">0%</div>
+                        <div class="stat-label">正确率</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-value" id="stat-mastered">0</div>
+                        <div class="stat-label">已掌握单词</div>
+                    </div>
+                </div>
+                <div class="module-stats-section">
+                    <h2>📈 模块练习统计</h2>
+                    <div class="module-stats-grid">
+                        <div class="module-stat-card">
+                            <div class="module-stat-header">
+                                <span class="module-stat-icon">✏️</span>
+                                <span class="module-stat-name">例句练习</span>
+                            </div>
+                            <div class="module-stat-body">
+                                <div class="module-stat-row">
+                                    <span>练习次数</span>
+                                    <strong id="stat-practice-total">0</strong>
+                                </div>
+                                <div class="module-stat-row">
+                                    <span>答对次数</span>
+                                    <strong id="stat-practice-correct">0</strong>
+                                </div>
+                                <div class="module-stat-row">
+                                    <span>正确率</span>
+                                    <strong id="stat-practice-rate">0%</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="module-stat-card">
+                            <div class="module-stat-header">
+                                <span class="module-stat-icon">📖</span>
+                                <span class="module-stat-name">阅读练习</span>
+                            </div>
+                            <div class="module-stat-body">
+                                <div class="module-stat-row">
+                                    <span>完成篇数</span>
+                                    <strong id="stat-reading-passages">0</strong>
+                                </div>
+                                <div class="module-stat-row">
+                                    <span>答题总数</span>
+                                    <strong id="stat-reading-total">0</strong>
+                                </div>
+                                <div class="module-stat-row">
+                                    <span>答对题数</span>
+                                    <strong id="stat-reading-correct">0</strong>
+                                </div>
+                                <div class="module-stat-row">
+                                    <span>正确率</span>
+                                    <strong id="stat-reading-rate">0%</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="module-stat-card">
+                            <div class="module-stat-header">
+                                <span class="module-stat-icon">🌐</span>
+                                <span class="module-stat-name">翻译练习</span>
+                            </div>
+                            <div class="module-stat-body">
+                                <div class="module-stat-row">
+                                    <span>完成篇数</span>
+                                    <strong id="stat-translation-total">0</strong>
+                                </div>
+                                <div class="module-stat-row">
+                                    <span>翻译句数</span>
+                                    <strong id="stat-translation-sentences">0</strong>
+                                </div>
+                                <div class="module-stat-row">
+                                    <span>平均得分</span>
+                                    <strong id="stat-translation-avg">0</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="level-distribution">
+                    <h2>等级分布</h2>
+                    <div class="level-bars" id="level-bars">
+                        <!-- 等级条形图 -->
+                    </div>
+                </div>
+                <div class="recent-activity">
+                    <h2>最近练习</h2>
+                    <div class="activity-list" id="activity-list">
+                        <!-- 最近活动 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 设置弹窗 -->
+    <div class="modal" id="settings-modal" style="display: none;">
+        <div class="modal-content">
+            <!-- 流星星空背景 -->
+            <div class="settings-starry-bg" id="settings-starry-bg"></div>
+            <div class="modal-header">
+                <h2>⚙️ 设置</h2>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label>阿里云 API Key</label>
+                    <input type="password" id="api-key" placeholder="输入你的阿里云通义千问 API Key">
+                    <small>用于AI翻译评判功能</small>
+                </div>
+                <div class="setting-item">
+                    <label>每页显示数量</label>
+                    <select id="page-size">
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="200">200</option>
+                    </select>
+                </div>
+
+                <!-- 主题颜色设置 -->
+                <div class="theme-settings">
+                    <h3 class="theme-section-title">🎨 主题颜色</h3>
+
+                    <div class="theme-presets">
+                        <div class="theme-presets-label">预设主题</div>
+                        <div class="theme-preset-grid" id="theme-preset-grid">
+                            <!-- 由JS生成预设主题卡片 -->
+                        </div>
+                    </div>
+
+                    <div class="theme-custom">
+                        <div class="theme-custom-label">自定义颜色</div>
+                        <div class="theme-custom-grid">
+                            <div class="theme-color-item">
+                                <label>主色调</label>
+                                <input type="color" id="theme-color-accent" value="#4a9eff" class="theme-color-input">
+                            </div>
+                            <div class="theme-color-item">
+                                <label>背景色</label>
+                                <input type="color" id="theme-color-bg" value="#0f0f1a" class="theme-color-input">
+                            </div>
+                            <div class="theme-color-item">
+                                <label>卡片色</label>
+                                <input type="color" id="theme-color-card" value="#16213e" class="theme-color-input">
+                            </div>
+                            <div class="theme-color-item">
+                                <label>文字色</label>
+                                <input type="color" id="theme-color-text" value="#e0e0e0" class="theme-color-input">
+                            </div>
+                        </div>
+                        <button class="btn-apply-theme" id="btn-apply-custom-theme">应用自定义颜色</button>
+                        <button class="btn-reset-theme" id="btn-reset-theme">恢复默认主题</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-save" id="btn-save-settings">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置按钮 -->
+    <button class="settings-btn" id="settings-btn">
+        <svg class="settings-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6m4.22-10.22l4.24-4.24M7.76 16.24l-4.24 4.24M23 12h-6m-6 0H1m20.07 4.93l-4.24-4.24M7.76 7.76L3.52 3.52"/>
+            <path d="M12 1v6m0 6v6m4.22-10.22l4.24-4.24M7.76 16.24l-4.24 4.24M23 12h-6m-6 0H1m20.07 4.93l-4.24-4.24M7.76 7.76L3.52 3.52" transform="rotate(45 12 12)"/>
+        </svg>
+        <span class="settings-label">设置</span>
+    </button>
+
+    <script src="words_data.js?v=4"></script>
+    <script src="backend/api-client.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="agent-frontend.js"></script>
+    <script src="app.js?v=32"></script>
+    <script>
+        // Force fresh data on new word database
+        if (typeof EMBEDDED_WORDS !== 'undefined') {
+            const stored = localStorage.getItem('wordCollection_words');
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    // If stored word count differs from embedded, refresh
+                    if (parsed.length !== EMBEDDED_WORDS.length) {
+                        localStorage.removeItem('wordCollection_words');
+                        localStorage.removeItem('wordCollection_activity');
+                        location.reload();
+                    }
+                } catch(e) {}
+            }
+        }
+    </script>
+</body>
+</html>

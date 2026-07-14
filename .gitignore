@@ -1,0 +1,7 @@
+agent-backend/
+backend/
+.spark/
+node_modules/
+*.log
+.env
+.env.local
