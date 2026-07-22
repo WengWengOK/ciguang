@@ -635,15 +635,6 @@ class WordCollectionApp {
             this.generateNewPassage();
         });
 
-        // 季节主题切换
-        document.querySelectorAll('[data-season]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('[data-season]').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.applySeasonTheme(btn.dataset.season);
-            });
-        });
-
         // 阅读练习 - 拍照
         document.getElementById('reading-btn-start-camera')?.addEventListener('click', () => {
             this.startReadingCamera();
@@ -9143,133 +9134,128 @@ WordCollectionApp.prototype.extractKeywords = function(sentence) {
 WordCollectionApp.prototype.applySeasonTheme = function(season) {
     this.currentSeason = season;
     
-    // 设置body的data-season属性
+    // 设置body的data-season属性驱动CSS变量切换
     if (season === 'default') {
         document.body.removeAttribute('data-season');
     } else {
         document.body.setAttribute('data-season', season);
     }
     
-    // 移除旧的粒子容器
-    document.querySelectorAll('.season-particles-summer, .season-particles-spring, .season-particles-autumn, .season-particles-winter, .season-glow-1, .season-glow-2').forEach(el => el.remove());
-    
-    // 移除旧的种子/风格引用（清理）
-    const seedInput = document.getElementById('reading-seed-input');
-    if (seedInput) seedInput.value = '';
+    // 清除旧粒子容器
+    document.querySelectorAll('.season-particles').forEach(el => el.remove());
     
     // 创建粒子效果
     if (season !== 'default') {
         this.createSeasonParticles(season);
-        this.createSeasonGlow(season);
     }
     
-    // 保存选择
+    // 更新设置弹窗和所有data-season按钮的active状态
+    document.querySelectorAll('[data-season]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.season === season);
+    });
+    
     localStorage.setItem('ciguang_season', season);
 }
 
 WordCollectionApp.prototype.createSeasonParticles = function(season) {
-    const containerClass = `season-particles-${season}`;
     const container = document.createElement('div');
-    container.className = containerClass;
+    container.className = 'season-particles';
+    container.setAttribute('data-type', season);
     
     if (season === 'summer') {
-        // 波浪 + 气泡
+        // 波浪线
         for (let i = 0; i < 2; i++) {
             const wave = document.createElement('div');
-            wave.className = 'wave';
-            wave.style.animationDelay = `${i * 1}s`;
+            wave.className = 'wave-line';
             container.appendChild(wave);
         }
-        for (let i = 0; i < 15; i++) {
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            bubble.style.left = Math.random() * 100 + '%';
-            bubble.style.bottom = Math.random() * 20 + '%';
-            bubble.style.animationDuration = (3 + Math.random() * 4) + 's';
-            bubble.style.animationDelay = Math.random() * 5 + 's';
-            bubble.style.width = bubble.style.height = (4 + Math.random() * 6) + 'px';
-            container.appendChild(bubble);
+        // 浮动光斑
+        for (let i = 0; i < 8; i++) {
+            const orb = document.createElement('div');
+            orb.className = 'glow-orb';
+            const size = 40 + Math.random() * 80;
+            orb.style.width = size + 'px';
+            orb.style.height = size + 'px';
+            orb.style.left = Math.random() * 100 + '%';
+            orb.style.top = Math.random() * 100 + '%';
+            orb.style.animationDelay = (Math.random() * 5) + 's';
+            orb.style.animationDuration = (4 + Math.random() * 4) + 's';
+            container.appendChild(orb);
         }
     } else if (season === 'spring') {
-        // 花瓣
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 25; i++) {
             const petal = document.createElement('div');
             petal.className = 'petal';
             petal.style.left = Math.random() * 100 + '%';
-            petal.style.animationDuration = (5 + Math.random() * 6) + 's';
-            petal.style.animationDelay = Math.random() * 8 + 's';
-            const size = 8 + Math.random() * 10;
+            petal.style.animationDuration = (6 + Math.random() * 7) + 's';
+            petal.style.animationDelay = Math.random() * 10 + 's';
+            const size = 6 + Math.random() * 10;
             petal.style.width = size + 'px';
-            petal.style.height = size + 'px';
-            const hue = 330 + Math.random() * 30;
-            petal.style.background = `radial-gradient(ellipse at center, hsla(${hue},80%,60%,0.5) 0%, hsla(${hue},80%,60%,0.1) 70%, transparent 100%)`;
+            petal.style.height = size * 0.7 + 'px';
+            const hue = 330 + Math.random() * 40;
+            const lightness = 60 + Math.random() * 20;
+            petal.style.background = `hsla(${hue}, 80%, ${lightness}%, 0.7)`;
             container.appendChild(petal);
         }
     } else if (season === 'autumn') {
-        // 落叶
-        for (let i = 0; i < 15; i++) {
+        const emojis = ['🍂', '🍁', '🍃'];
+        for (let i = 0; i < 18; i++) {
             const leaf = document.createElement('div');
-            leaf.className = 'leaf';
+            leaf.className = 'leaf-particle';
+            leaf.textContent = emojis[Math.floor(Math.random() * emojis.length)];
             leaf.style.left = Math.random() * 100 + '%';
-            leaf.style.animationDuration = (6 + Math.random() * 8) + 's';
-            leaf.style.animationDelay = Math.random() * 10 + 's';
-            const size = 12 + Math.random() * 12;
-            leaf.style.width = size + 'px';
-            leaf.style.height = size + 'px';
-            const leafEmojis = ['🍂', '🍁', '🍃'];
-            leaf.innerHTML = '';
-            const before = leaf.querySelector('::before') || leaf;
-            // 使用内联样式设置emoji
-            leaf.style.fontSize = size + 'px';
-            leaf.style.lineHeight = '1';
-            leaf.textContent = leafEmojis[Math.floor(Math.random() * leafEmojis.length)];
+            leaf.style.animationDuration = (7 + Math.random() * 9) + 's';
+            leaf.style.animationDelay = Math.random() * 12 + 's';
+            leaf.style.fontSize = (10 + Math.random() * 8) + 'px';
             container.appendChild(leaf);
         }
     } else if (season === 'winter') {
-        // 雪花
-        for (let i = 0; i < 30; i++) {
-            const snowflake = document.createElement('div');
-            snowflake.className = 'snowflake';
-            snowflake.style.left = Math.random() * 100 + '%';
-            snowflake.style.animationDuration = (4 + Math.random() * 6) + 's';
-            snowflake.style.animationDelay = Math.random() * 8 + 's';
-            const size = 4 + Math.random() * 8;
-            snowflake.style.width = size + 'px';
-            snowflake.style.height = size + 'px';
-            snowflake.style.opacity = 0.3 + Math.random() * 0.5;
-            container.appendChild(snowflake);
+        for (let i = 0; i < 35; i++) {
+            const snow = document.createElement('div');
+            snow.className = 'snow';
+            snow.style.left = Math.random() * 100 + '%';
+            snow.style.animationDuration = (5 + Math.random() * 7) + 's';
+            snow.style.animationDelay = Math.random() * 10 + 's';
+            const size = 3 + Math.random() * 7;
+            snow.style.width = size + 'px';
+            snow.style.height = size + 'px';
+            snow.style.opacity = (0.3 + Math.random() * 0.5).toString();
+            container.appendChild(snow);
         }
     }
     
     document.body.appendChild(container);
 }
 
-WordCollectionApp.prototype.createSeasonGlow = function(season) {
-    const glowColors = {
-        summer: ['rgba(0,188,212,0.15)', 'rgba(255,152,0,0.1)'],
-        spring: ['rgba(233,30,99,0.1)', 'rgba(139,195,74,0.1)'],
-        autumn: ['rgba(255,87,34,0.1)', 'rgba(255,193,7,0.1)'],
-        winter: ['rgba(144,202,249,0.12)', 'rgba(227,242,253,0.08)']
-    };
-    
-    const colors = glowColors[season] || [];
-    colors.forEach((color, i) => {
-        const glow = document.createElement('div');
-        glow.className = `season-glow season-glow-${i + 1}`;
-        glow.style.background = color;
-        document.body.appendChild(glow);
-    });
-}
-
 WordCollectionApp.prototype.initSeasonTheme = function() {
+    // 创建氛围光晕（始终存在，由CSS控制opacity）
+    let ambient1 = document.querySelector('.season-ambient-1');
+    let ambient2 = document.querySelector('.season-ambient-2');
+    if (!ambient1) {
+        ambient1 = document.createElement('div');
+        ambient1.className = 'season-ambient season-ambient-1';
+        document.body.appendChild(ambient1);
+    }
+    if (!ambient2) {
+        ambient2 = document.createElement('div');
+        ambient2.className = 'season-ambient season-ambient-2';
+        document.body.appendChild(ambient2);
+    }
+    
+    // 从localStorage恢复季节
     const saved = localStorage.getItem('ciguang_season');
     if (saved && saved !== 'default') {
         this.applySeasonTheme(saved);
-        // 更新按钮状态
-        document.querySelectorAll('[data-season]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.season === saved);
-        });
     }
+    
+    // 绑定设置弹窗中的季节卡片点击
+    setTimeout(() => {
+        document.querySelectorAll('#season-preset-grid [data-season]').forEach(card => {
+            card.addEventListener('click', () => {
+                this.applySeasonTheme(card.dataset.season);
+            });
+        });
+    }, 100);
 }
 
 // ===== 学习助手Agent =====

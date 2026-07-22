@@ -244,15 +244,6 @@
                             <button class="source-tab" data-reading-source="photo">📷 拍照上传</button>
                         </div>
                         <div class="source-panel active" id="reading-panel-random">
-                            <!-- 季节主题模板 -->
-                            <div class="season-themes">
-                                <span class="season-label">🎨 季节主题：</span>
-                                <button class="season-btn active" data-season="default">✨ 默认</button>
-                                <button class="season-btn" data-season="summer">🌊 清凉盛夏</button>
-                                <button class="season-btn" data-season="spring">🌸 春意盎然</button>
-                                <button class="season-btn" data-season="autumn">🍂 飘落秋色</button>
-                                <button class="season-btn" data-season="winter">❄️ 大雪纷飞</button>
-                            </div>
                             <div class="reading-generate-options">
                                 <button class="btn-generate-custom" id="btn-start-random-reading" style="background:var(--accent);color:#fff;">📝 开始练习</button>
                                 <button class="btn-generate-ai" id="btn-generate-ai-reading">🤖 AI生成文章</button>
@@ -1085,6 +1076,43 @@
                         </div>
                         <button class="btn-apply-theme" id="btn-apply-custom-theme">应用自定义颜色</button>
                         <button class="btn-reset-theme" id="btn-reset-theme">恢复默认主题</button>
+                    </div>
+
+                    <!-- 季节氛围主题 -->
+                    <div class="season-theme-settings" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                        <h4 style="margin-bottom: 16px; color: var(--text-primary); font-size: 1rem;">🌆 季节氛围</h4>
+                        <div class="season-preset-grid" id="season-preset-grid">
+                            <div class="season-preset-card active" data-season="default">
+                                <div class="season-preview" style="background: linear-gradient(135deg, #0f0f1a, #1a1a2e);">
+                                    <span style="font-size: 1.5rem;">✨</span>
+                                </div>
+                                <div class="season-name">默认星空</div>
+                            </div>
+                            <div class="season-preset-card" data-season="summer">
+                                <div class="season-preview" style="background: linear-gradient(135deg, #004d40, #00838f);">
+                                    <span style="font-size: 1.5rem;">🌊</span>
+                                </div>
+                                <div class="season-name">清凉盛夏</div>
+                            </div>
+                            <div class="season-preset-card" data-season="spring">
+                                <div class="season-preview" style="background: linear-gradient(135deg, #880e4f, #4a148c);">
+                                    <span style="font-size: 1.5rem;">🌸</span>
+                                </div>
+                                <div class="season-name">春意盎然</div>
+                            </div>
+                            <div class="season-preset-card" data-season="autumn">
+                                <div class="season-preview" style="background: linear-gradient(135deg, #bf360c, #e65100);">
+                                    <span style="font-size: 1.5rem;">🍂</span>
+                                </div>
+                                <div class="season-name">飘落秋色</div>
+                            </div>
+                            <div class="season-preset-card" data-season="winter">
+                                <div class="season-preview" style="background: linear-gradient(135deg, #1a237e, #283593);">
+                                    <span style="font-size: 1.5rem;">❄️</span>
+                                </div>
+                                <div class="season-name">大雪纷飞</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- 按钮外观设置 -->

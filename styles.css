@@ -1116,214 +1116,240 @@ body.light-theme .navbar {
     margin-top: 10px;
 }
 
-/* 季节主题模板 */
-.season-themes {
+/* ===== 设置弹窗中的季节主题卡片 ===== */
+.season-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+}
+.season-preset-card {
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 2px solid var(--border-color);
+    transition: all 0.3s;
+    text-align: center;
+}
+.season-preset-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.season-preset-card.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent), 0 4px 12px rgba(0,0,0,0.3);
+}
+.season-preview {
+    height: 56px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-}
-.season-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-right: 4px;
-    white-space: nowrap;
-}
-.season-btn {
-    padding: 8px 16px;
-    border: 2px solid var(--border-color);
-    border-radius: 20px;
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.3s;
-    white-space: nowrap;
+    justify-content: center;
     position: relative;
     overflow: hidden;
 }
-.season-btn:hover {
-    border-color: var(--accent);
+.season-name {
+    padding: 8px 4px 6px;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.season-preset-card.active .season-name {
     color: var(--accent);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-.season-btn.active {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: #fff;
-    box-shadow: 0 2px 12px rgba(74,158,255,0.3);
 }
 
-/* 季节主题 - 盛夏 */
+/* ===== 季节氛围 - 全局背景色切换 ===== */
+body[data-season="default"] {
+    --season-bg-primary: var(--bg-primary);
+    --season-bg-secondary: var(--bg-secondary);
+    --season-bg-card: var(--bg-card);
+    --season-bg-hover: var(--bg-hover);
+    --season-text-primary: var(--text-primary);
+    --season-accent: var(--accent);
+}
 body[data-season="summer"] {
-    --season-accent: #00bcd4;
-    --season-accent2: #ff9800;
-    --season-glow: rgba(0, 188, 212, 0.15);
+    --season-bg-primary: #051a18;
+    --season-bg-secondary: #0a2927;
+    --season-bg-card: #0d3330;
+    --season-bg-hover: #134540;
+    --season-text-primary: #e0f7f4;
+    --season-text-secondary: #80cbc4;
+    --season-text-muted: #4db6ac;
+    --season-border-color: #1b5e55;
+    --season-accent: #00e5ff;
+    --season-accent-dim: rgba(0, 229, 255, 0.15);
 }
-body[data-season="summer"] .navbar,
-body[data-season="summer"] .page-header {
-    background: linear-gradient(135deg, #006064 0%, #00838f 50%, #006064 100%) !important;
-}
-/* 盛夏波浪动画 */
-.season-particles-summer {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-}
-.season-particles-summer .wave {
-    position: absolute;
-    bottom: -10px;
-    width: 200%;
-    height: 60px;
-    background: rgba(0, 188, 212, 0.06);
-    border-radius: 40% 40% 0 0;
-    animation: waveFloat 6s ease-in-out infinite;
-}
-.season-particles-summer .wave:nth-child(2) {
-    height: 40px;
-    background: rgba(0, 188, 212, 0.04);
-    animation: waveFloat 8s ease-in-out infinite reverse;
-    bottom: 10px;
-}
-.season-particles-summer .bubble {
-    position: absolute;
-    width: 6px; height: 6px;
-    background: rgba(0, 188, 212, 0.3);
-    border-radius: 50%;
-    animation: bubbleRise 4s ease-in infinite;
-}
-@keyframes waveFloat {
-    0%, 100% { transform: translateX(0); }
-    50% { transform: translateX(-25%); }
-}
-@keyframes bubbleRise {
-    0% { opacity: 0; transform: translateY(0) scale(0); }
-    20% { opacity: 1; transform: translateY(-20vh) scale(1); }
-    100% { opacity: 0; transform: translateY(-100vh) scale(0.5); }
-}
-
-/* 季节主题 - 春天 */
 body[data-season="spring"] {
-    --season-accent: #e91e63;
-    --season-accent2: #8bc34a;
-    --season-glow: rgba(233, 30, 99, 0.1);
+    --season-bg-primary: #1a0a18;
+    --season-bg-secondary: #2a1228;
+    --season-bg-card: #351535;
+    --season-bg-hover: #4a1e48;
+    --season-text-primary: #fce4ec;
+    --season-text-secondary: #f48fb1;
+    --season-text-muted: #e91e90;
+    --season-border-color: #6a1b5e;
+    --season-accent: #f06292;
+    --season-accent-dim: rgba(240, 98, 146, 0.15);
 }
-body[data-season="spring"] .navbar,
-body[data-season="spring"] .page-header {
-    background: linear-gradient(135deg, #880e4f 0%, #ad1457 50%, #880e4f 100%) !important;
-}
-.season-particles-spring {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-}
-.season-particles-spring .petal {
-    position: absolute;
-    width: 12px; height: 12px;
-    background: radial-gradient(ellipse at center, rgba(233,30,99,0.6) 0%, rgba(233,30,99,0.1) 70%, transparent 100%);
-    border-radius: 50% 0 50% 50%;
-    animation: petalFall linear infinite;
-}
-@keyframes petalFall {
-    0% { opacity: 0; transform: translateY(-10vh) translateX(0) rotate(0deg); }
-    10% { opacity: 0.8; }
-    90% { opacity: 0.6; }
-    100% { opacity: 0; transform: translateY(110vh) translateX(100px) rotate(720deg); }
-}
-
-/* 季节主题 - 秋天 */
 body[data-season="autumn"] {
-    --season-accent: #ff5722;
-    --season-accent2: #ffc107;
-    --season-glow: rgba(255, 87, 34, 0.1);
+    --season-bg-primary: #1a0f05;
+    --season-bg-secondary: #2e1a0a;
+    --season-bg-card: #3e2210;
+    --season-bg-hover: #553018;
+    --season-text-primary: #fff3e0;
+    --season-text-secondary: #ffcc80;
+    --season-text-muted: #ffa726;
+    --season-border-color: #5d3a1a;
+    --season-accent: #ff9100;
+    --season-accent-dim: rgba(255, 145, 0, 0.15);
 }
-body[data-season="autumn"] .navbar,
-body[data-season="autumn"] .page-header {
-    background: linear-gradient(135deg, #bf360c 0%, #e64a19 50%, #bf360c 100%) !important;
-}
-.season-particles-autumn {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-}
-.season-particles-autumn .leaf {
-    position: absolute;
-    width: 16px; height: 16px;
-    animation: leafFall linear infinite;
-}
-.season-particles-autumn .leaf::before {
-    content: '🍂';
-    font-size: 16px;
-    position: absolute;
-    top: 0; left: 0;
-}
-@keyframes leafFall {
-    0% { opacity: 0; transform: translateY(-10vh) translateX(0) rotate(0deg) scale(0.8); }
-    10% { opacity: 0.9; }
-    50% { transform: translateY(50vh) translateX(80px) rotate(360deg) scale(1); }
-    90% { opacity: 0.5; }
-    100% { opacity: 0; transform: translateY(110vh) translateX(-30px) rotate(720deg) scale(0.6); }
-}
-
-/* 季节主题 - 冬天 */
 body[data-season="winter"] {
-    --season-accent: #90caf9;
-    --season-accent2: #e3f2fd;
-    --season-glow: rgba(144, 202, 249, 0.12);
+    --season-bg-primary: #0a0e2a;
+    --season-bg-secondary: #111838;
+    --season-bg-card: #182050;
+    --season-bg-hover: #202a5e;
+    --season-text-primary: #e8eaf6;
+    --season-text-secondary: #9fa8da;
+    --season-text-muted: #7986cb;
+    --season-border-color: #283593;
+    --season-accent: #82b1ff;
+    --season-accent-dim: rgba(130, 177, 255, 0.15);
 }
-body[data-season="winter"] .navbar,
-body[data-season="winter"] .page-header {
-    background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #1a237e 100%) !important;
+
+/* 季节氛围激活时覆盖全局CSS变量 */
+body[data-season] #main-content,
+body[data-season] .navbar,
+body[data-season] .page,
+body[data-season] .floating-nav-bar {
+    background-color: var(--season-bg-secondary, var(--bg-secondary));
+    transition: background-color 0.8s ease, color 0.6s ease;
 }
-.season-particles-winter {
+body[data-season] .navbar,
+body[data-season] .floating-nav-bar {
+    background: var(--season-bg-primary, var(--bg-primary)) !important;
+    border-color: var(--season-border-color, var(--border-color));
+}
+body[data-season] .stat-card,
+body[data-season] .word-card,
+body[data-season] .result-detail,
+body[data-season] .module-stat-card,
+body[data-season] .modal-content,
+body[data-season] .reading-passage,
+body[data-season] .source-panel,
+body[data-season] .source-tab {
+    background-color: var(--season-bg-card, var(--bg-card));
+    border-color: var(--season-border-color, var(--border-color));
+    transition: background-color 0.8s ease;
+}
+body[data-season] h1, body[data-season] h2, body[data-season] h3 {
+    color: var(--season-accent, var(--text-primary));
+}
+body[data-season] p, body[data-season] span, body[data-season] label,
+body[data-season] li, body[data-season] div:not(.season-particles):not(.season-ambient) {
+    color: var(--season-text-primary, var(--text-primary));
+}
+
+/* ===== 季节粒子效果 ===== */
+.season-particles {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     pointer-events: none;
     z-index: 0;
     overflow: hidden;
 }
-.season-particles-winter .snowflake {
+
+/* 盛夏 - 波浪 + 光斑 */
+.season-particles[data-type="summer"] .wave-line {
     position: absolute;
-    width: 8px; height: 8px;
-    background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.2) 70%, transparent 100%);
-    border-radius: 50%;
-    animation: snowFall linear infinite;
-    filter: blur(0.5px);
+    bottom: 0;
+    width: 200%;
+    height: 80px;
+    opacity: 0.06;
+    animation: summerWave 8s ease-in-out infinite;
 }
-@keyframes snowFall {
-    0% { opacity: 0; transform: translateY(-10vh) translateX(0); }
-    10% { opacity: 0.8; }
-    50% { transform: translateY(50vh) translateX(40px); }
-    100% { opacity: 0; transform: translateY(110vh) translateX(-20px); }
+.season-particles[data-type="summer"] .wave-line:nth-child(1) { background: linear-gradient(180deg, transparent, var(--season-accent)); animation-delay: 0s; }
+.season-particles[data-type="summer"] .wave-line:nth-child(2) { height: 50px; opacity: 0.04; animation-delay: -3s; animation-duration: 10s; }
+.season-particles[data-type="summer"] .glow-orb {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--season-accent-dim), transparent 70%);
+    animation: orbFloat 6s ease-in-out infinite;
+}
+@keyframes summerWave {
+    0%, 100% { transform: translateX(0) scaleY(1); }
+    50% { transform: translateX(-25%) scaleY(1.2); }
+}
+@keyframes orbFloat {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.3; }
+    50% { transform: translateY(-30px) scale(1.1); opacity: 0.6; }
 }
 
-/* 季节背景光晕 */
-.season-glow {
-    position: fixed;
+/* 春天 - 花瓣飘落 */
+.season-particles[data-type="spring"] .petal {
+    position: absolute;
+    border-radius: 50% 0 50% 50%;
+    opacity: 0;
+    animation: petalDrift linear infinite;
+}
+@keyframes petalDrift {
+    0% { opacity: 0; transform: translateY(-5vh) translateX(0) rotate(0deg) scale(0.6); }
+    8% { opacity: 0.7; }
+    85% { opacity: 0.4; }
+    100% { opacity: 0; transform: translateY(105vh) translateX(80px) rotate(540deg) scale(0.4); }
+}
+
+/* 秋天 - 落叶 */
+.season-particles[data-type="autumn"] .leaf-particle {
+    position: absolute;
+    animation: leafDrift linear infinite;
+    font-size: 14px;
+    line-height: 1;
+}
+@keyframes leafDrift {
+    0% { opacity: 0; transform: translateY(-5vh) translateX(0) rotate(0deg); }
+    10% { opacity: 0.8; }
+    50% { transform: translateY(50vh) translateX(60px) rotate(360deg); }
+    90% { opacity: 0.4; }
+    100% { opacity: 0; transform: translateY(105vh) translateX(-20px) rotate(720deg); }
+}
+
+/* 冬天 - 雪花 */
+.season-particles[data-type="winter"] .snow {
+    position: absolute;
     border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.8), rgba(255,255,255,0.15));
+    animation: snowDrift linear infinite;
+}
+@keyframes snowDrift {
+    0% { opacity: 0; transform: translateY(-5vh) translateX(0); }
+    10% { opacity: 0.7; }
+    50% { transform: translateY(50vh) translateX(30px); }
+    100% { opacity: 0; transform: translateY(105vh) translateX(-15px); }
+}
+
+/* 背景氛围光晕 */
+.season-ambient {
+    position: fixed;
     pointer-events: none;
     z-index: 0;
-    filter: blur(80px);
-    opacity: 0.4;
-    transition: all 1s ease;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0;
+    transition: opacity 1.2s ease;
 }
-.season-glow-1 {
-    top: -100px; right: -100px;
-    width: 400px; height: 400px;
+body[data-season="summer"] .season-ambient,
+body[data-season="spring"] .season-ambient,
+body[data-season="autumn"] .season-ambient,
+body[data-season="winter"] .season-ambient {
+    opacity: 0.25;
 }
-.season-glow-2 {
-    bottom: -100px; left: -100px;
-    width: 300px; height: 300px;
+.season-ambient-1 { top: -150px; right: -100px; width: 450px; height: 450px; }
+.season-ambient-2 { bottom: -100px; left: -80px; width: 350px; height: 350px; }
+
+@media (max-width: 600px) {
+    .season-preset-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
 
 .btn-generate-ai {
     padding: 8px 16px;
