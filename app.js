@@ -376,9 +376,8 @@ class WordCollectionApp {
         this.currentPassage = null;
         this.readingAnswers = {};
         this.readingCurrentQuestion = 0;
-        this.readingSeed = '';        // 当前随机种子
-        this.readingStyle = 'auto';   // 当前文章风格预设
         this.readingCameraStream = null; // 阅读页相机流
+        this.currentSeason = 'default';   // 当前季节主题
         
         // 翻译练习状态
         this.translationTopic = 'culture';
@@ -430,6 +429,7 @@ class WordCollectionApp {
         await this.loadWords();
         this.setupEventListeners();
         this.initMemory();
+        this.initSeasonTheme();
         this.renderLetterNav();
         this.renderCollection();
         this.updateTotalCount();
@@ -635,21 +635,12 @@ class WordCollectionApp {
             this.generateNewPassage();
         });
 
-        // 阅读练习 - 种子与风格
-        document.getElementById('btn-seed-random')?.addEventListener('click', () => {
-            const seed = 's' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-            document.getElementById('reading-seed-input').value = seed;
-            this.readingSeed = seed;
-        });
-        document.getElementById('btn-seed-clear')?.addEventListener('click', () => {
-            document.getElementById('reading-seed-input').value = '';
-            this.readingSeed = '';
-        });
-        document.querySelectorAll('[data-style]').forEach(btn => {
+        // 季节主题切换
+        document.querySelectorAll('[data-season]').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('[data-style]').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('[data-season]').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                this.readingStyle = btn.dataset.style;
+                this.applySeasonTheme(btn.dataset.season);
             });
         });
 
@@ -1769,29 +1760,22 @@ class WordCollectionApp {
             return;
         }
         
-        // 读取用户输入的种子
-        const seedInput = document.getElementById('reading-seed-input')?.value?.trim() || '';
-        this.readingSeed = seedInput;
-        
         // Select words based on difficulty
         const wordCounts = { easy: 8, medium: 12, hard: 16 };
         const count = wordCounts[this.readingDifficulty] || 10;
         
-        // 用种子或Math.random选词
         const selectedWords = [];
         const usedIndices = new Set();
-        const prng = this.readingSeed ? this.createSeededRandom(this.readingSeed) : null;
         while (selectedWords.length < count && usedIndices.size < this.words.length) {
-            const rand = prng ? prng() : Math.random();
-            const idx = Math.floor(rand * this.words.length);
+            const idx = Math.floor(Math.random() * this.words.length);
             if (!usedIndices.has(idx)) {
                 usedIndices.add(idx);
                 selectedWords.push(this.words[idx]);
             }
         }
         
-        // Generate passage using templates (with seed & style)
-        const passage = this.buildPassage(selectedWords, this.readingSeed, this.readingStyle);
+        // Generate passage using templates
+        const passage = this.buildPassage(selectedWords);
         this.currentPassage = passage;
         this.readingAnswers = {};
         this.readingCurrentQuestion = 0;
@@ -1901,7 +1885,7 @@ class WordCollectionApp {
         return shuffled;
     }
 
-    buildPassage(words, seed, style) {
+    buildPassage(words) {
         // Pick a theme based on the words
         const themes = [
             { name: 'Campus Life', templates: [
@@ -1957,50 +1941,14 @@ class WordCollectionApp {
         ];
 
         // 风格映射：不同风格优先选择不同主题，但auto保持随机
-        const styleThemeMap = {
-            'academic': ['Workplace Essentials', 'Health and Psychology', 'Campus Life'],
-            'narrative': ['Campus Life', 'Social Media Influence'],
-            'news': ['Social Media Influence', 'Environmental Behavior', 'Workplace Essentials'],
-            'argumentative': ['Social Media Influence', 'Environmental Behavior', 'Health and Psychology'],
-            'science': ['Health and Psychology', 'Environmental Behavior'],
-            'auto': []  // 所有主题均可
-        };
-
-        const effectiveStyle = style || 'auto';
-        const candidateThemes = styleThemeMap[effectiveStyle] || styleThemeMap['auto'];
-
-        let theme;
-        if (seed && candidateThemes.length > 0) {
-            // 用种子从候选主题中选择
-            const rng = this.createSeededRandom(seed + '_theme');
-            const idx = Math.floor(rng() * candidateThemes.length);
-            const themeName = candidateThemes[idx];
-            theme = themes.find(t => t.name === themeName);
-            // 如果没找到匹配的主题，回退到第一个主题
-            if (!theme) theme = themes[0];
-        } else if (seed) {
-            // auto 模式有种子：从所有主题中用种子选
-            const rng = this.createSeededRandom(seed + '_theme');
-            theme = themes[Math.floor(rng() * themes.length)];
-        } else {
-            // 无种子：完全随机
-            const candidateList = candidateThemes.length > 0
-                ? themes.filter(t => candidateThemes.includes(t.name))
-                : themes;
-            if (candidateList.length > 0) {
-                theme = candidateList[Math.floor(Math.random() * candidateList.length)];
-            } else {
-                theme = themes[Math.floor(Math.random() * themes.length)];
-            }
-        }
+        // 随机选择主题
+        let theme = themes[Math.floor(Math.random() * themes.length)];
 
         // All difficulties use 8 paragraphs for 600-800 words
         const numParagraphs = 8;
 
         // Shuffle and pick paragraphs
-        const shuffledTemplates = seed
-            ? this.seededShuffle(theme.templates, seed + '_para')
-            : [...theme.templates].sort(() => Math.random() - 0.5);
+        const shuffledTemplates = [...theme.templates].sort(() => Math.random() - 0.5);
         const selectedParagraphs = shuffledTemplates.slice(0, numParagraphs);
 
         // Replace placeholders with words from the word bank
@@ -2032,7 +1980,7 @@ class WordCollectionApp {
         });
 
         // Generate questions
-        const questions = this.generateQuestions(usedWords, passageText, theme.name, selectedParagraphs, seed);
+        const questions = this.generateQuestions(usedWords, passageText, theme.name, selectedParagraphs);
 
         return {
             title: theme.name,
@@ -2044,11 +1992,11 @@ class WordCollectionApp {
         };
     }
 
-    generateQuestions(words, passageText, theme, paragraphs, seed) {
+    generateQuestions(words, passageText, theme, paragraphs) {
         const questions = [];
 
-        // 创建基于种子的随机数生成器（用于未来可能的随机逻辑）
-        const rng = seed ? this.createSeededRandom(seed + '_questions') : null;
+        // 随机数生成器
+        const rng = null;
 
         // Theme Chinese translation map
         const themeCnMap = {
@@ -9189,6 +9137,139 @@ WordCollectionApp.prototype.extractKeywords = function(sentence) {
     // 简单提取句子中较长的中文词作为关键词提示
     const words = sentence.match(/[\u4e00-\u9fa5]{2,4}/g) || [];
     return words.slice(0, 3);
+}
+
+// ===== 季节主题系统 =====
+WordCollectionApp.prototype.applySeasonTheme = function(season) {
+    this.currentSeason = season;
+    
+    // 设置body的data-season属性
+    if (season === 'default') {
+        document.body.removeAttribute('data-season');
+    } else {
+        document.body.setAttribute('data-season', season);
+    }
+    
+    // 移除旧的粒子容器
+    document.querySelectorAll('.season-particles-summer, .season-particles-spring, .season-particles-autumn, .season-particles-winter, .season-glow-1, .season-glow-2').forEach(el => el.remove());
+    
+    // 移除旧的种子/风格引用（清理）
+    const seedInput = document.getElementById('reading-seed-input');
+    if (seedInput) seedInput.value = '';
+    
+    // 创建粒子效果
+    if (season !== 'default') {
+        this.createSeasonParticles(season);
+        this.createSeasonGlow(season);
+    }
+    
+    // 保存选择
+    localStorage.setItem('ciguang_season', season);
+}
+
+WordCollectionApp.prototype.createSeasonParticles = function(season) {
+    const containerClass = `season-particles-${season}`;
+    const container = document.createElement('div');
+    container.className = containerClass;
+    
+    if (season === 'summer') {
+        // 波浪 + 气泡
+        for (let i = 0; i < 2; i++) {
+            const wave = document.createElement('div');
+            wave.className = 'wave';
+            wave.style.animationDelay = `${i * 1}s`;
+            container.appendChild(wave);
+        }
+        for (let i = 0; i < 15; i++) {
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.style.left = Math.random() * 100 + '%';
+            bubble.style.bottom = Math.random() * 20 + '%';
+            bubble.style.animationDuration = (3 + Math.random() * 4) + 's';
+            bubble.style.animationDelay = Math.random() * 5 + 's';
+            bubble.style.width = bubble.style.height = (4 + Math.random() * 6) + 'px';
+            container.appendChild(bubble);
+        }
+    } else if (season === 'spring') {
+        // 花瓣
+        for (let i = 0; i < 20; i++) {
+            const petal = document.createElement('div');
+            petal.className = 'petal';
+            petal.style.left = Math.random() * 100 + '%';
+            petal.style.animationDuration = (5 + Math.random() * 6) + 's';
+            petal.style.animationDelay = Math.random() * 8 + 's';
+            const size = 8 + Math.random() * 10;
+            petal.style.width = size + 'px';
+            petal.style.height = size + 'px';
+            const hue = 330 + Math.random() * 30;
+            petal.style.background = `radial-gradient(ellipse at center, hsla(${hue},80%,60%,0.5) 0%, hsla(${hue},80%,60%,0.1) 70%, transparent 100%)`;
+            container.appendChild(petal);
+        }
+    } else if (season === 'autumn') {
+        // 落叶
+        for (let i = 0; i < 15; i++) {
+            const leaf = document.createElement('div');
+            leaf.className = 'leaf';
+            leaf.style.left = Math.random() * 100 + '%';
+            leaf.style.animationDuration = (6 + Math.random() * 8) + 's';
+            leaf.style.animationDelay = Math.random() * 10 + 's';
+            const size = 12 + Math.random() * 12;
+            leaf.style.width = size + 'px';
+            leaf.style.height = size + 'px';
+            const leafEmojis = ['🍂', '🍁', '🍃'];
+            leaf.innerHTML = '';
+            const before = leaf.querySelector('::before') || leaf;
+            // 使用内联样式设置emoji
+            leaf.style.fontSize = size + 'px';
+            leaf.style.lineHeight = '1';
+            leaf.textContent = leafEmojis[Math.floor(Math.random() * leafEmojis.length)];
+            container.appendChild(leaf);
+        }
+    } else if (season === 'winter') {
+        // 雪花
+        for (let i = 0; i < 30; i++) {
+            const snowflake = document.createElement('div');
+            snowflake.className = 'snowflake';
+            snowflake.style.left = Math.random() * 100 + '%';
+            snowflake.style.animationDuration = (4 + Math.random() * 6) + 's';
+            snowflake.style.animationDelay = Math.random() * 8 + 's';
+            const size = 4 + Math.random() * 8;
+            snowflake.style.width = size + 'px';
+            snowflake.style.height = size + 'px';
+            snowflake.style.opacity = 0.3 + Math.random() * 0.5;
+            container.appendChild(snowflake);
+        }
+    }
+    
+    document.body.appendChild(container);
+}
+
+WordCollectionApp.prototype.createSeasonGlow = function(season) {
+    const glowColors = {
+        summer: ['rgba(0,188,212,0.15)', 'rgba(255,152,0,0.1)'],
+        spring: ['rgba(233,30,99,0.1)', 'rgba(139,195,74,0.1)'],
+        autumn: ['rgba(255,87,34,0.1)', 'rgba(255,193,7,0.1)'],
+        winter: ['rgba(144,202,249,0.12)', 'rgba(227,242,253,0.08)']
+    };
+    
+    const colors = glowColors[season] || [];
+    colors.forEach((color, i) => {
+        const glow = document.createElement('div');
+        glow.className = `season-glow season-glow-${i + 1}`;
+        glow.style.background = color;
+        document.body.appendChild(glow);
+    });
+}
+
+WordCollectionApp.prototype.initSeasonTheme = function() {
+    const saved = localStorage.getItem('ciguang_season');
+    if (saved && saved !== 'default') {
+        this.applySeasonTheme(saved);
+        // 更新按钮状态
+        document.querySelectorAll('[data-season]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.season === saved);
+        });
+    }
 }
 
 // ===== 学习助手Agent =====

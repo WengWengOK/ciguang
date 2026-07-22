@@ -244,24 +244,14 @@
                             <button class="source-tab" data-reading-source="photo">📷 拍照上传</button>
                         </div>
                         <div class="source-panel active" id="reading-panel-random">
-                            <!-- 种子随机 & 风格选择 -->
-                            <div class="seed-control">
-                                <div class="seed-input-row">
-                                    <label class="seed-label">🎲 随机种子：</label>
-                                    <input type="text" id="reading-seed-input" class="seed-input" placeholder="输入种子（如 campus2024）或留空随机" />
-                                    <button class="btn-seed-random" id="btn-seed-random" title="生成随机种子">🎲</button>
-                                    <button class="btn-seed-clear" id="btn-seed-clear" title="清空种子，使用纯随机">✕</button>
-                                </div>
-                                <div class="seed-info">相同种子 + 相同风格 = 相同文章，可分享给同学同步练习</div>
-                            </div>
-                            <div class="style-presets">
-                                <span class="style-label">📖 文章风格：</span>
-                                <button class="style-preset-btn active" data-style="auto">🤖 智能匹配</button>
-                                <button class="style-preset-btn" data-style="academic">🎓 学术论文</button>
-                                <button class="style-preset-btn" data-style="narrative">📖 叙事故事</button>
-                                <button class="style-preset-btn" data-style="news">📰 新闻报道</button>
-                                <button class="style-preset-btn" data-style="argumentative">⚖️ 议论文</button>
-                                <button class="style-preset-btn" data-style="science">🔬 科普说明</button>
+                            <!-- 季节主题模板 -->
+                            <div class="season-themes">
+                                <span class="season-label">🎨 季节主题：</span>
+                                <button class="season-btn active" data-season="default">✨ 默认</button>
+                                <button class="season-btn" data-season="summer">🌊 清凉盛夏</button>
+                                <button class="season-btn" data-season="spring">🌸 春意盎然</button>
+                                <button class="season-btn" data-season="autumn">🍂 飘落秋色</button>
+                                <button class="season-btn" data-season="winter">❄️ 大雪纷飞</button>
                             </div>
                             <div class="reading-generate-options">
                                 <button class="btn-generate-custom" id="btn-start-random-reading" style="background:var(--accent);color:#fff;">📝 开始练习</button>
