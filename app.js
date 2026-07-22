@@ -205,15 +205,13 @@ const LevelSystem = {
 
 // ===== 例句生成 =====
 const ExampleGenerator = {
-    templates: [
+    // 名词模板 (n.)
+    nounTemplates: [
         "The {word} plays an important role in our daily life.",
         "Many people don't understand the true meaning of {word}.",
         "The professor explained the concept of {word} in detail.",
-        "In the exam, you need to know how to use {word} correctly.",
         "The {word} is often discussed in academic papers.",
         "Understanding {word} is essential for learning English.",
-        "The author used {word} to express his ideas clearly.",
-        "Students should practice using {word} in sentences.",
         "The meaning of {word} has changed over time.",
         "In this context, {word} refers to something specific.",
         "We should pay attention to the {word} when reading this passage.",
@@ -221,33 +219,122 @@ const ExampleGenerator = {
         "It is widely acknowledged that {word} has a significant impact on society.",
         "Researchers have found that {word} can lead to unexpected results.",
         "The {word} has become a hot topic in recent years.",
+        "The book provides a comprehensive analysis of {word}.",
+        "A deep understanding of {word} helps us grasp the passage better.",
+        "The author emphasizes the importance of {word} throughout the text."
+    ],
+    // 动词模板 (v./vt./vi.)
+    verbTemplates: [
+        "In the exam, you need to know how to {word} correctly.",
+        "The author used {word} to express his ideas clearly.",
+        "Students should practice how to {word} in different situations.",
         "She tried to {word} but failed in the end.",
         "They decided to {word} after a long discussion.",
         "The ability to {word} is considered a key skill in modern education.",
         "One of the biggest challenges is how to {word} effectively.",
-        "The book provides a comprehensive analysis of {word}."
+        "Learning to {word} properly takes years of practice.",
+        "You must {word} if you want to achieve your goals.",
+        "The teacher asked students to {word} in their homework.",
+        "Scientists continue to {word} in order to find new solutions.",
+        "It is important to {word} at the right time.",
+        "Many young people choose to {word} during their college years.",
+        "Parents often encourage children to {word} from an early age.",
+        "The new policy aims to help citizens {word} more easily."
     ],
-    
+    // 形容词模板 (adj.)
+    adjTemplates: [
+        "The professor gave a {word} explanation of the theory.",
+        "It is {word} for students to review lessons regularly.",
+        "The results of the experiment were quite {word}.",
+        "A {word} attitude is essential for success.",
+        "The city has become increasingly {word} in recent years.",
+        "Many people find it {word} to balance work and life.",
+        "The novel describes a {word} scene that impresses readers.",
+        "Students should develop a {word} habit of reading.",
+        "The environment here is {word} for studying.",
+        "His performance in the exam was truly {word}.",
+        "A {word} approach can solve this problem effectively.",
+        "The teacher is {word} and always helps students patiently.",
+        "It is {word} to prepare well before the examination.",
+        "The new technology makes our life more {word}.",
+        "Maintaining a {word} lifestyle benefits our health."
+    ],
+    // 副词模板 (adv.)
+    advTemplates: [
+        "She {word} finished her homework before dinner.",
+        "The team worked {word} to meet the deadline.",
+        "He {word} agreed with the professor's viewpoint.",
+        "The situation has {word} improved over the past decade.",
+        "Students should {word} check their answers before submission.",
+        "The theory can be {word} applied to real-world problems.",
+        "They {word} discussed the plan for three hours.",
+        "The data shows that the economy is recovering {word}.",
+        "You need to think {word} before making a decision.",
+        "The author {word} describes the beauty of nature.",
+        "Children learn languages {word} at a young age.",
+        "The project was completed {word} ahead of schedule.",
+        "He spoke {word} during the academic conference.",
+        "The medicine works {word} to relieve pain.",
+        "We should {word} follow the guidelines provided."
+    ],
+    // 通用模板（无法判断词性时使用）
+    generalTemplates: [
+        "In the exam, you need to know how to use {word} correctly.",
+        "Students should practice using {word} in sentences.",
+        "The author used {word} to express his ideas clearly.",
+        "Understanding {word} is essential for learning English.",
+        "The meaning of {word} has changed over time.",
+        "In this context, {word} refers to something specific.",
+        "The book provides a comprehensive analysis of {word}.",
+        "Many people don't understand the true meaning of {word}."
+    ],
+
     _lastTemplateIndex: -1,
-    
-    generate(word, avoidIndex = -1) {
-        // Pick a random template, avoiding the last one used
+    _lastTemplateType: '',
+
+    getPos(wordObj) {
+        if (!wordObj || !wordObj.meaning) return 'general';
+        const m = wordObj.meaning.trim();
+        if (m.startsWith('adj.')) return 'adj';
+        if (m.startsWith('adv.')) return 'adv';
+        if (m.startsWith('vt.') || m.startsWith('vi.') || m.startsWith('v.')) return 'verb';
+        if (m.startsWith('n.')) return 'noun';
+        if (m.startsWith('prep.') || m.startsWith('art.') || m.startsWith('conj.')) return 'general';
+        return 'general';
+    },
+
+    getTemplatesByPos(pos) {
+        switch (pos) {
+            case 'noun': return this.nounTemplates;
+            case 'verb': return this.verbTemplates;
+            case 'adj': return this.adjTemplates;
+            case 'adv': return this.advTemplates;
+            default: return this.generalTemplates;
+        }
+    },
+
+    generate(wordObj, avoidIndex = -1) {
+        const pos = this.getPos(wordObj);
+        const templates = this.getTemplatesByPos(pos);
+        const word = typeof wordObj === 'string' ? wordObj : wordObj.word;
+
         let idx;
+        let attempts = 0;
         do {
-            idx = Math.floor(Math.random() * this.templates.length);
-        } while (idx === avoidIndex && this.templates.length > 1);
-        
+            idx = Math.floor(Math.random() * templates.length);
+            attempts++;
+        } while (idx === avoidIndex && templates.length > 1 && attempts < 10);
+
         this._lastTemplateIndex = idx;
-        const template = this.templates[idx];
+        this._lastTemplateType = pos;
+        const template = templates[idx];
         return template.replace('{word}', word);
     },
-    
-    generateHighlighted(word, avoidIndex = -1) {
-        const sentence = this.generate(word, avoidIndex);
-        // Highlight the word in the sentence with red color
-        // Use word boundary for short words to avoid partial matches
+
+    generateHighlighted(wordObj, avoidIndex = -1) {
+        const sentence = this.generate(wordObj, avoidIndex);
+        const word = typeof wordObj === 'string' ? wordObj : wordObj.word;
         const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // For words <= 2 chars, use word boundary to avoid matching inside other words
         const pattern = word.length <= 2 ? `\\b${escaped}\\b` : escaped;
         const regex = new RegExp(pattern, 'gi');
         return sentence.replace(regex, '<span class="highlight-word">$&</span>');
@@ -289,6 +376,8 @@ class WordCollectionApp {
         this.currentPassage = null;
         this.readingAnswers = {};
         this.readingCurrentQuestion = 0;
+        this.readingSeed = '';        // 当前随机种子
+        this.readingStyle = 'auto';   // 当前文章风格预设
         this.readingCameraStream = null; // 阅读页相机流
         
         // 翻译练习状态
@@ -329,7 +418,10 @@ class WordCollectionApp {
             cloze: { start: null, elapsed: 0 },
             memory: { start: null, elapsed: 0 }
         };
-        
+
+        // 学习总时长（持久化）
+        this.totalStudyTime = parseInt(localStorage.getItem('ciguang_study_time') || '0');
+
         this.init();
     }
     
@@ -538,6 +630,27 @@ class WordCollectionApp {
         });
         document.getElementById('btn-start-custom-reading')?.addEventListener('click', () => {
             this.startCustomReading();
+        });
+        document.getElementById('btn-start-random-reading')?.addEventListener('click', () => {
+            this.generateNewPassage();
+        });
+
+        // 阅读练习 - 种子与风格
+        document.getElementById('btn-seed-random')?.addEventListener('click', () => {
+            const seed = 's' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+            document.getElementById('reading-seed-input').value = seed;
+            this.readingSeed = seed;
+        });
+        document.getElementById('btn-seed-clear')?.addEventListener('click', () => {
+            document.getElementById('reading-seed-input').value = '';
+            this.readingSeed = '';
+        });
+        document.querySelectorAll('[data-style]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-style]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.readingStyle = btn.dataset.style;
+            });
         });
 
         // 阅读练习 - 拍照
@@ -1314,7 +1427,7 @@ class WordCollectionApp {
         
         // Generate highlighted example sentence
         this.currentExampleIndex = ExampleGenerator._lastTemplateIndex;
-        const highlightedExample = ExampleGenerator.generateHighlighted(word.word, this.currentExampleIndex);
+        const highlightedExample = ExampleGenerator.generateHighlighted(word, this.currentExampleIndex);
         
         // Update word display
         document.getElementById('practice-word').textContent = word.word;
@@ -1365,7 +1478,7 @@ class WordCollectionApp {
         
         setTimeout(() => {
             // Generate new highlighted example (avoiding current)
-            const highlightedExample = ExampleGenerator.generateHighlighted(word.word, this.currentExampleIndex);
+            const highlightedExample = ExampleGenerator.generateHighlighted(word, this.currentExampleIndex);
             sentenceEl.innerHTML = highlightedExample;
             sentenceEl.classList.remove('refreshing');
             refreshBtn.disabled = false;
@@ -1656,23 +1769,29 @@ class WordCollectionApp {
             return;
         }
         
+        // 读取用户输入的种子
+        const seedInput = document.getElementById('reading-seed-input')?.value?.trim() || '';
+        this.readingSeed = seedInput;
+        
         // Select words based on difficulty
         const wordCounts = { easy: 8, medium: 12, hard: 16 };
         const count = wordCounts[this.readingDifficulty] || 10;
         
-        // Randomly select words from the database
+        // 用种子或Math.random选词
         const selectedWords = [];
         const usedIndices = new Set();
+        const prng = this.readingSeed ? this.createSeededRandom(this.readingSeed) : null;
         while (selectedWords.length < count && usedIndices.size < this.words.length) {
-            const idx = Math.floor(Math.random() * this.words.length);
+            const rand = prng ? prng() : Math.random();
+            const idx = Math.floor(rand * this.words.length);
             if (!usedIndices.has(idx)) {
                 usedIndices.add(idx);
                 selectedWords.push(this.words[idx]);
             }
         }
         
-        // Generate passage using templates
-        const passage = this.buildPassage(selectedWords);
+        // Generate passage using templates (with seed & style)
+        const passage = this.buildPassage(selectedWords, this.readingSeed, this.readingStyle);
         this.currentPassage = passage;
         this.readingAnswers = {};
         this.readingCurrentQuestion = 0;
@@ -1681,9 +1800,10 @@ class WordCollectionApp {
         this.renderPassage(passage);
         this.renderQuestions(passage.questions);
         
-        // Hide result and reset nav item colors
+        // Hide result and source switch, reset nav item colors
         document.getElementById('reading-result').style.display = 'none';
         document.getElementById('reading-card').style.display = 'block';
+        document.getElementById('reading-source-switch').style.display = 'none';
         document.querySelectorAll('.reading-nav-item').forEach(item => {
             item.classList.remove('nav-correct', 'nav-wrong');
         });
@@ -1723,9 +1843,10 @@ class WordCollectionApp {
                 this.readingCurrentQuestion = 0;
                 this.renderPassage(passage);
                 this.renderQuestions(passage.questions);
-                
+
                 document.getElementById('reading-result').style.display = 'none';
                 document.getElementById('reading-card').style.display = 'block';
+                document.getElementById('reading-source-switch').style.display = 'none';
                 document.querySelectorAll('.reading-nav-item').forEach(item => {
                     item.classList.remove('nav-correct', 'nav-wrong');
                 });
@@ -1740,8 +1861,47 @@ class WordCollectionApp {
             this.hideLoading();
         }
     }
-    
-    buildPassage(words) {
+
+    // ===== 种子随机数生成器 =====
+    /**
+     * 基于字符串种子创建可重复的伪随机数生成器 (Mulberry32)
+     * @param {string} seed - 种子字符串
+     * @returns {Function} 返回 0~1 之间的伪随机数
+     */
+    createSeededRandom(seed) {
+        // 将字符串转换为数字种子
+        let hash = 0;
+        const str = String(seed);
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0; // 转为32位整数
+        }
+        // Mulberry32 PRNG
+        let state = hash >>> 0;
+        return function() {
+            state += 0x6D2B79F5;
+            let t = state;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    /**
+     * 使用种子的 Fisher-Yates 洗牌
+     */
+    seededShuffle(arr, seed) {
+        const rng = this.createSeededRandom(seed + '_shuffle');
+        const shuffled = [...arr];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    buildPassage(words, seed, style) {
         // Pick a theme based on the words
         const themes = [
             { name: 'Campus Life', templates: [
@@ -1796,13 +1956,51 @@ class WordCollectionApp {
             ]}
         ];
 
-        const theme = themes[Math.floor(Math.random() * themes.length)];
+        // 风格映射：不同风格优先选择不同主题，但auto保持随机
+        const styleThemeMap = {
+            'academic': ['Workplace Essentials', 'Health and Psychology', 'Campus Life'],
+            'narrative': ['Campus Life', 'Social Media Influence'],
+            'news': ['Social Media Influence', 'Environmental Behavior', 'Workplace Essentials'],
+            'argumentative': ['Social Media Influence', 'Environmental Behavior', 'Health and Psychology'],
+            'science': ['Health and Psychology', 'Environmental Behavior'],
+            'auto': []  // 所有主题均可
+        };
+
+        const effectiveStyle = style || 'auto';
+        const candidateThemes = styleThemeMap[effectiveStyle] || styleThemeMap['auto'];
+
+        let theme;
+        if (seed && candidateThemes.length > 0) {
+            // 用种子从候选主题中选择
+            const rng = this.createSeededRandom(seed + '_theme');
+            const idx = Math.floor(rng() * candidateThemes.length);
+            const themeName = candidateThemes[idx];
+            theme = themes.find(t => t.name === themeName);
+            // 如果没找到匹配的主题，回退到第一个主题
+            if (!theme) theme = themes[0];
+        } else if (seed) {
+            // auto 模式有种子：从所有主题中用种子选
+            const rng = this.createSeededRandom(seed + '_theme');
+            theme = themes[Math.floor(rng() * themes.length)];
+        } else {
+            // 无种子：完全随机
+            const candidateList = candidateThemes.length > 0
+                ? themes.filter(t => candidateThemes.includes(t.name))
+                : themes;
+            if (candidateList.length > 0) {
+                theme = candidateList[Math.floor(Math.random() * candidateList.length)];
+            } else {
+                theme = themes[Math.floor(Math.random() * themes.length)];
+            }
+        }
 
         // All difficulties use 8 paragraphs for 600-800 words
         const numParagraphs = 8;
 
         // Shuffle and pick paragraphs
-        const shuffledTemplates = [...theme.templates].sort(() => Math.random() - 0.5);
+        const shuffledTemplates = seed
+            ? this.seededShuffle(theme.templates, seed + '_para')
+            : [...theme.templates].sort(() => Math.random() - 0.5);
         const selectedParagraphs = shuffledTemplates.slice(0, numParagraphs);
 
         // Replace placeholders with words from the word bank
@@ -1834,7 +2032,7 @@ class WordCollectionApp {
         });
 
         // Generate questions
-        const questions = this.generateQuestions(usedWords, passageText, theme.name, selectedParagraphs);
+        const questions = this.generateQuestions(usedWords, passageText, theme.name, selectedParagraphs, seed);
 
         return {
             title: theme.name,
@@ -1846,8 +2044,11 @@ class WordCollectionApp {
         };
     }
 
-    generateQuestions(words, passageText, theme, paragraphs) {
+    generateQuestions(words, passageText, theme, paragraphs, seed) {
         const questions = [];
+
+        // 创建基于种子的随机数生成器（用于未来可能的随机逻辑）
+        const rng = seed ? this.createSeededRandom(seed + '_questions') : null;
 
         // Theme Chinese translation map
         const themeCnMap = {
@@ -2241,6 +2442,15 @@ class WordCollectionApp {
         // Show result below the passage (keep article visible)
         document.getElementById('reading-result').style.display = 'block';
         document.getElementById('reading-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        // 学习助手Agent反馈
+        const wrongItems = results.filter(r => !r.isCorrect).map(r => ({
+            question: r.question,
+            word: r.correctAnswer || '',
+            correctAnswer: r.correctAnswer,
+            userAnswer: r.userAnswer
+        }));
+        this.showAgentFeedback('reading', score, correct, questions.length, wrongItems);
     }
     
     renderReadingResult(score, correct, total, results) {
@@ -2382,6 +2592,16 @@ class WordCollectionApp {
     }
     
     generateExplanation(q, userAnswer, isCorrect) {
+        // 优先使用AI生成的解析
+        if (q.explanation) {
+            if (isCorrect) {
+                return `正确！${q.explanation}`;
+            }
+            if (userAnswer === undefined) {
+                return `未作答。正确答案是 ${q.options[q.correct]}。${q.explanation}`;
+            }
+            return `错误。你选择了 ${q.options[userAnswer]}，但正确答案是 ${q.options[q.correct]}。${q.explanation}`;
+        }
         if (isCorrect) {
             return `正确！${q.options[q.correct]} 是最佳答案，因为该选项与文章主旨和上下文逻辑一致。`;
         }
@@ -3094,6 +3314,14 @@ class WordCollectionApp {
         // Hide card, show result
         document.getElementById('cloze-card').style.display = 'none';
         document.getElementById('cloze-result').style.display = 'block';
+
+        // 学习助手Agent反馈
+        const clozeWrongItems = results.filter(r => !r.isCorrect).map(r => ({
+            word: r.word || '',
+            correctAnswer: r.word,
+            userAnswer: r.userAnswer || ''
+        }));
+        this.showAgentFeedback('cloze', score, correct, blanks.length, clozeWrongItems);
     }
 
     renderClozeResult(score, correct, total, results) {
@@ -3279,7 +3507,7 @@ class WordCollectionApp {
     renderTranslationSentences(material) {
         const container = document.getElementById('translation-sentences');
         container.innerHTML = '';
-        
+
         material.sentences.forEach((s, idx) => {
             const item = document.createElement('div');
             item.className = 'translation-sentence-item';
@@ -3288,10 +3516,20 @@ class WordCollectionApp {
                 <div class="sentence-cn">${s.cn}</div>
                 <div class="sentence-keywords-hint">💡 关键词提示：${s.keywords.map(k => `<span class="keyword-tag">${k}</span>`).join(' ')}</div>
                 <textarea id="translation-input-${idx}" placeholder="Please type the English translation..." data-idx="${idx}"></textarea>
+                <div class="sentence-upload-row">
+                    <button class="btn-photo-sentence" onclick="app.openSentencePhotoDialog(${idx})" title="拍照识别填入">
+                        📷 拍照
+                    </button>
+                    <button class="btn-photo-sentence" onclick="document.getElementById('sentence-file-${idx}').click()" title="上传文件识别">
+                        📎 文件
+                    </button>
+                    <input type="file" id="sentence-file-${idx}" accept="image/*" style="display:none" onchange="app.handleSentenceFile(${idx}, this)">
+                    <span class="photo-status" id="sentence-photo-status-${idx}"></span>
+                </div>
             `;
             container.appendChild(item);
         });
-        
+
         // Add input listeners
         container.querySelectorAll('textarea').forEach(textarea => {
             textarea.addEventListener('input', (e) => {
@@ -3409,6 +3647,14 @@ ${sentences.map((s, idx) => {
         
         document.getElementById('translation-card').style.display = 'none';
         document.getElementById('translation-result').style.display = 'block';
+
+        // 学习助手Agent反馈
+        const transWrongItems = results.filter(r => r.score < 60).map(r => ({
+            score: r.score,
+            correctAnswer: r.refEn || '',
+            userAnswer: r.userInput || ''
+        }));
+        this.showAgentFeedback('translation', avgScore, completed, results.length, transWrongItems);
     }
     
     localTranslationEval(sentences, results) {
@@ -3856,6 +4102,9 @@ ${sentences.map((s, idx) => {
             if (timer.start) {
                 timer.elapsed = Date.now() - timer.start;
                 timer.start = null;
+                // 持久化学习总时长
+                this.totalStudyTime += timer.elapsed;
+                localStorage.setItem('ciguang_study_time', String(this.totalStudyTime));
                 return timer.elapsed;
             }
         }
@@ -5034,6 +5283,12 @@ ${sentences.map((s, idx) => {
                 this.renderWritingEvaluation(result.data.evaluation);
                 document.getElementById('writing-evaluation').style.display = 'block';
                 document.getElementById('writing-evaluation').scrollIntoView({ behavior: 'smooth' });
+
+                // 学习助手Agent反馈
+                const evaScore = result.data.evaluation.totalScore || 0;
+                const evaCorrect = evaScore >= 60 ? 1 : 0;
+                const evaWrongItems = evaScore < 60 ? [{ score: evaScore }] : [];
+                this.showAgentFeedback('writing', evaScore, evaCorrect, 1, evaWrongItems);
             } else {
                 alert('评分失败：' + (result.errorMessage || '未知错误'));
             }
@@ -5102,18 +5357,44 @@ ${sentences.map((s, idx) => {
     }
 
     // ===== 阅读练习 - 自定义输入 =====
-    startCustomReading() {
+    async startCustomReading() {
         const text = document.getElementById('reading-custom-text').value.trim();
         if (!text) {
             alert('请先输入英文文章内容');
             return;
         }
-        if (text.split(/\s+/).filter(w => w).length < 30) {
-            alert('文章内容过短，请输入至少30个单词的文章');
-            return;
+        // 不再限制字数，允许任意长度的文章
+
+        // 优先尝试AI生成高质量阅读理解题目
+        const apiKey = this.settings.apiKey;
+        if (apiKey) {
+            this.showLoading('AI正在分析文章并生成阅读理解题目...');
+            try {
+                const passage = await this.callAICustomReading(text);
+                this.currentPassage = passage;
+                this.readingAnswers = {};
+                this.readingCurrentQuestion = 0;
+
+                this.renderPassage(passage);
+                this.renderQuestions(passage.questions);
+
+                document.getElementById('reading-result').style.display = 'none';
+                document.getElementById('reading-card').style.display = 'block';
+                document.getElementById('reading-source-switch').style.display = 'none';
+                document.querySelectorAll('.reading-nav-item').forEach(item => {
+                    item.classList.remove('nav-correct', 'nav-wrong');
+                });
+
+                this.startTimer('reading');
+                this.hideLoading();
+                return;
+            } catch (err) {
+                console.error('AI生成阅读理解题目失败，使用本地模板:', err);
+                this.hideLoading();
+            }
         }
 
-        // 将用户文本解析为passage对象
+        // 回退：将用户文本解析为passage对象（本地模板）
         const passage = this.parseCustomReadingText(text);
         this.currentPassage = passage;
         this.readingAnswers = {};
@@ -5123,15 +5404,159 @@ ${sentences.map((s, idx) => {
         this.renderPassage(passage);
         this.renderQuestions(passage.questions);
 
-        // 显示阅读卡片，隐藏结果
+        // 显示阅读卡片，隐藏结果和来源选择
         document.getElementById('reading-result').style.display = 'none';
         document.getElementById('reading-card').style.display = 'block';
+        document.getElementById('reading-source-switch').style.display = 'none';
         document.querySelectorAll('.reading-nav-item').forEach(item => {
             item.classList.remove('nav-correct', 'nav-wrong');
         });
 
         // 开始计时
         this.startTimer('reading');
+    }
+
+    /**
+     * 调用AI为自定义文章生成阅读理解题目
+     * 使用qwen-turbo模型，返回与本地模板相同格式的passage对象
+     */
+    async callAICustomReading(text) {
+        const apiKey = this.settings.apiKey;
+        const difficulty = this.readingDifficulty || 'easy';
+        const difficultyMap = { easy: '简单', medium: '中等', hard: '困难' };
+
+        const prompt = `你是一位考研英语阅读理解出题专家。请根据以下英文文章，生成5道高质量的阅读理解选择题。
+
+文章内容：
+${text}
+
+难度要求：${difficultyMap[difficulty] || '中等'}
+
+请严格按照以下JSON格式返回（不要包含任何其他文字）：
+{
+  "cnText": "文章的中文翻译（每段之间用两个换行分隔）",
+  "questions": [
+    {
+      "text": "英文题目",
+      "textCn": "题目中文翻译",
+      "options": ["选项A", "选项B", "选项C", "选项D"],
+      "optionsCn": ["选项A中文", "选项B中文", "选项C中文", "选项D中文"],
+      "correct": 0,
+      "explanation": "答案解析（中文）"
+    }
+  ]
+}
+
+出题要求：
+1. 第1题为主旨大意题，考查对文章整体的理解
+2. 第2题为细节理解题，考查对文章具体信息的把握
+3. 第3题为词义推断题，从文章中选取一个关键词考查其在语境中的含义
+4. 第4题为推理判断题，考查根据文章信息进行合理推断的能力
+5. 第5题为作者态度/目的题，考查对作者意图和态度的理解
+6. 每道题的4个选项中只有一个正确答案，correct字段为正确答案的索引(0-3)
+7. 干扰项要有合理性，不能明显错误
+8. 题目和选项必须基于文章内容，不能凭空编造`;
+
+        const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'qwen-turbo',
+                input: {
+                    messages: [
+                        { role: 'system', content: '你是考研英语阅读理解出题专家，擅长根据文章内容设计高质量的阅读理解题目。你返回的结果必须是纯JSON格式。' },
+                        { role: 'user', content: prompt }
+                    ]
+                },
+                parameters: {
+                    result_format: 'message'
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('AI API请求失败');
+        }
+
+        const data = await response.json();
+        const content = data.output?.choices?.[0]?.message?.content || '';
+
+        // 解析JSON
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            throw new Error('无法解析AI返回的JSON');
+        }
+
+        const aiResult = JSON.parse(jsonMatch[0]);
+
+        // 构建标准passage对象
+        const wordCount = text.split(/\s+/).length;
+
+        // 从文本中提取标题（取第一句话的前几个词）
+        const firstSentence = text.split(/[.!?]/)[0]?.trim() || '';
+        const titleWords = firstSentence.split(/\s+/).slice(0, 5).join(' ');
+        const title = titleWords + (firstSentence.length > titleWords.length ? '...' : '');
+
+        // 处理AI返回的题目，确保格式正确
+        const questions = (aiResult.questions || []).slice(0, 5).map((q, i) => ({
+            text: q.text || `Question ${i + 1}`,
+            textCn: q.textCn || '',
+            options: (q.options || ['Option A', 'Option B', 'Option C', 'Option D']).slice(0, 4),
+            optionsCn: (q.optionsCn || ['', '', '', '']).slice(0, 4),
+            correct: typeof q.correct === 'number' ? q.correct : 0,
+            explanation: q.explanation || ''
+        }));
+
+        // 如果题目不足5道，用本地模板补充
+        while (questions.length < 5) {
+            const fallbackQ = this.generateFallbackQuestion(text, questions.length);
+            questions.push(fallbackQ);
+        }
+
+        return {
+            title: title || '自定义阅读材料',
+            text: text.trim(),
+            cnText: aiResult.cnText || '',
+            wordCount: wordCount,
+            questions: questions
+        };
+    }
+
+    /**
+     * 生成一道备用题目（当AI返回题目不足5道时使用）
+     */
+    generateFallbackQuestion(text, idx) {
+        const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 20);
+        const templates = [
+            {
+                text: 'What can be inferred from the passage?',
+                textCn: '从文章中可以推断出什么？',
+                options: ['A deeper understanding of the topic can help readers in practical ways', 'No further research is needed on this topic', 'All current practices related to the topic are ineffective', 'Readers should avoid engaging with the topic altogether'],
+                optionsCn: ['对该话题更深入的理解可以在实际方面帮助读者', '这个话题不需要进一步研究', '与该话题相关的所有当前实践都是无效的', '读者应该完全避免接触这个话题'],
+                correct: 0
+            },
+            {
+                text: "What is the author's primary purpose in writing this passage?",
+                textCn: '作者写这篇文章的主要目的是什么？',
+                options: ['To inform readers about a topic and encourage thoughtful engagement', 'To persuade readers to adopt a specific political viewpoint', 'To entertain readers with humorous anecdotes', 'To criticize current practices without offering alternatives'],
+                optionsCn: ['告知读者一个话题并鼓励深入思考', '说服读者采纳特定的政治观点', '用幽默的轶事来娱乐读者', '批评当前的实践而不提供替代方案'],
+                correct: 0
+            }
+        ];
+        return templates[idx % templates.length];
+    }
+
+    /**
+     * 返回阅读来源选择界面
+     */
+    backToReadingSource() {
+        this.stopTimer('reading');
+        document.getElementById('reading-card').style.display = 'none';
+        document.getElementById('reading-source-switch').style.display = 'block';
+        document.getElementById('reading-result').style.display = 'none';
     }
 
     /**
@@ -5493,9 +5918,3634 @@ ${sentences.map((s, idx) => {
     }
 }
 
+WordCollectionApp.prototype.switchExerciseDifficulty = function(exerciseType, difficulty) {
+    const config = this.exerciseTypes[exerciseType];
+    if (!config) {
+        console.warn(`[WordCollectionApp] 未知题型: ${exerciseType}`);
+        return false;
+    }
+
+    if (!config.difficulties.includes(difficulty)) {
+        console.warn(`[WordCollectionApp] 题型 ${exerciseType} 不支持难度: ${difficulty}`);
+        return false;
+    }
+
+    this.currentDifficulty[exerciseType] = difficulty;
+
+    // 保存用户偏好到本地存储
+    Storage.set(`difficulty_${exerciseType}`, difficulty);
+
+    // 触发难度切换事件
+    this.emit('difficultyChanged', { exerciseType, difficulty });
+
+    console.log(`[WordCollectionApp] ${config.name} 难度已切换为: ${this.getDifficultyLabel(difficulty)}`);
+
+    // 根据题型重新加载对应练习内容
+    this.reloadExerciseByType(exerciseType);
+
+    return true;
+};
+
+WordCollectionApp.prototype.getDifficultyLabel = function(difficulty) {
+    const labels = {
+        easy: '简单',
+        medium: '中等',
+        hard: '困难'
+    };
+    return labels[difficulty] || difficulty;
+};
+
+WordCollectionApp.prototype.renderDifficultySelector = function(exerciseType, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.warn(`[WordCollectionApp] 找不到难度选择器容器: ${containerId}`);
+        return;
+    }
+
+    const config = this.exerciseTypes[exerciseType];
+    if (!config) return;
+
+    const currentDiff = this.currentDifficulty[exerciseType] || 'medium';
+
+    const selectorHtml = `
+        <div class="difficulty-selector" data-type="${exerciseType}">
+            <span class="selector-label">难度:</span>
+            <div class="difficulty-options">
+                ${config.difficulties.map(diff => `
+                    <button
+                        class="difficulty-btn ${diff === currentDiff ? 'active' : ''}"
+                        data-difficulty="${diff}"
+                        onclick="app.switchExerciseDifficulty('${exerciseType}', '${diff}')"
+                    >
+                        ${this.getDifficultyLabel(diff)}
+                    </button>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = selectorHtml;
+
+    // 添加样式（如果尚未添加）
+    this.injectDifficultyStyles();
+};
+
+WordCollectionApp.prototype.injectDifficultyStyles = function() {
+    if (document.getElementById('difficulty-selector-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'difficulty-selector-styles';
+    style.textContent = `
+        .difficulty-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: var(--card-bg, #fff);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .difficulty-selector .selector-label {
+            font-size: 14px;
+            color: var(--text-secondary, #666);
+            font-weight: 500;
+        }
+        .difficulty-options {
+            display: flex;
+            gap: 8px;
+        }
+        .difficulty-btn {
+            padding: 4px 14px;
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 16px;
+            background: var(--btn-bg, #f5f5f5);
+            color: var(--text-primary, #333);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .difficulty-btn:hover {
+            background: var(--btn-hover-bg, #e8e8e8);
+        }
+        .difficulty-btn.active {
+            background: var(--primary-color, #4a90d9);
+            color: #fff;
+            border-color: var(--primary-color, #4a90d9);
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+WordCollectionApp.prototype.switchExerciseType = function(exerciseType, customType) {
+    const config = this.exerciseTypes[exerciseType];
+    if (!config) {
+        console.warn(`[WordCollectionApp] 未知题型: ${exerciseType}`);
+        return false;
+    }
+
+    this.customTypes[exerciseType] = customType;
+
+    // 保存用户偏好
+    Storage.set(`customType_${exerciseType}`, customType);
+
+    this.emit('customTypeChanged', { exerciseType, customType });
+
+    console.log(`[WordCollectionApp] ${config.name} 类型已切换为: ${customType}`);
+
+    // 重新加载练习内容
+    this.reloadExerciseByType(exerciseType);
+
+    return true;
+};
+
+WordCollectionApp.prototype.renderTypeSelector = function(exerciseType, containerId, options) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.warn(`[WordCollectionApp] 找不到类型选择器容器: ${containerId}`);
+        return;
+    }
+
+    const config = this.exerciseTypes[exerciseType];
+    if (!config) return;
+
+    const currentType = this.customTypes[exerciseType] || 'general';
+
+    const selectorHtml = `
+        <div class="type-selector" data-type="${exerciseType}">
+            <span class="selector-label">类型:</span>
+            <select class="type-select"
+                onchange="app.switchExerciseType('${exerciseType}', this.value)">
+                ${options.map(opt => `
+                    <option value="${opt.value}" ${opt.value === currentType ? 'selected' : ''}>
+                        ${opt.label}
+                    </option>
+                `).join('')}
+            </select>
+        </div>
+    `;
+
+    container.innerHTML = selectorHtml;
+
+    this.injectTypeSelectorStyles();
+};
+
+WordCollectionApp.prototype.injectTypeSelectorStyles = function() {
+    if (document.getElementById('type-selector-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'type-selector-styles';
+    style.textContent = `
+        .type-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: var(--card-bg, #fff);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .type-selector .selector-label {
+            font-size: 14px;
+            color: var(--text-secondary, #666);
+            font-weight: 500;
+        }
+        .type-select {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 6px;
+            background: var(--input-bg, #fff);
+            color: var(--text-primary, #333);
+            font-size: 13px;
+            cursor: pointer;
+            min-width: 120px;
+        }
+        .type-select:focus {
+            outline: none;
+            border-color: var(--primary-color, #4a90d9);
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+WordCollectionApp.prototype.toggleExerciseTranslation = function(exerciseType) {
+    const config = this.exerciseTypes[exerciseType];
+    if (!config) {
+        console.warn(`[WordCollectionApp] 未知题型: ${exerciseType}`);
+        return false;
+    }
+
+    if (!config.hasTranslation) {
+        console.log(`[WordCollectionApp] ${config.name} 不支持翻译显示`);
+        return false;
+    }
+
+    this.showTranslation[exerciseType] = !this.showTranslation[exerciseType];
+
+    // 保存用户偏好
+    Storage.set(`showTranslation_${exerciseType}`, this.showTranslation[exerciseType]);
+
+    // 更新UI
+    this.updateTranslationDisplay(exerciseType);
+
+    this.emit('translationToggled', {
+        exerciseType,
+        show: this.showTranslation[exerciseType]
+    });
+
+    return true;
+};
+
+WordCollectionApp.prototype.updateTranslationDisplay = function(exerciseType) {
+    const container = document.querySelector(`[data-exercise="${exerciseType}"] .translation-content`);
+    if (!container) return;
+
+    const shouldShow = this.showTranslation[exerciseType];
+    container.style.display = shouldShow ? 'block' : 'none';
+
+    // 更新切换按钮状态
+    const toggleBtn = document.querySelector(`[data-exercise="${exerciseType}"] .translation-toggle-btn`);
+    if (toggleBtn) {
+        toggleBtn.textContent = shouldShow ? '隐藏翻译' : '显示翻译';
+        toggleBtn.classList.toggle('active', shouldShow);
+    }
+};
+
+WordCollectionApp.prototype.renderTranslation = function(exerciseType, translationText, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const config = this.exerciseTypes[exerciseType];
+    if (!config || !config.hasTranslation) return;
+
+    const isVisible = this.showTranslation[exerciseType];
+
+    container.innerHTML = `
+        <div class="translation-wrapper" data-exercise="${exerciseType}">
+            <button class="translation-toggle-btn ${isVisible ? 'active' : ''}"
+                onclick="app.toggleExerciseTranslation('${exerciseType}')">
+                ${isVisible ? '隐藏翻译' : '显示翻译'}
+            </button>
+            <div class="translation-content" style="display: ${isVisible ? 'block' : 'none'}">
+                <div class="translation-text">${translationText}</div>
+            </div>
+        </div>
+    `;
+
+    this.injectTranslationStyles();
+};
+
+WordCollectionApp.prototype.injectTranslationStyles = function() {
+    if (document.getElementById('translation-display-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'translation-display-styles';
+    style.textContent = `
+        .translation-wrapper {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--translation-bg, #f8f9fa);
+            border-radius: 8px;
+            border-left: 3px solid var(--primary-color, #4a90d9);
+        }
+        .translation-toggle-btn {
+            padding: 4px 12px;
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 4px;
+            background: var(--btn-bg, #fff);
+            color: var(--text-primary, #333);
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .translation-toggle-btn.active {
+            background: var(--primary-color, #4a90d9);
+            color: #fff;
+            border-color: var(--primary-color, #4a90d9);
+        }
+        .translation-text {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary, #555);
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+WordCollectionApp.prototype.renderFloatingNav = function(exerciseType, items, currentIndex = 0) {
+    const config = this.exerciseTypes[exerciseType];
+    if (!config || !config.hasFloatingNav) {
+        console.log(`[WordCollectionApp] ${config ? config.name : exerciseType} 不支持悬浮导航`);
+        return;
+    }
+
+    // 移除已有的悬浮导航
+    const existingNav = document.getElementById(`floating-nav-${exerciseType}`);
+    if (existingNav) existingNav.remove();
+
+    // 初始化导航状态
+    this.floatingNavStates[exerciseType] = {
+        collapsed: false,
+        items: items.map((item, idx) => ({
+            ...item,
+            index: idx,
+            status: 'unanswered' // unanswered / correct / wrong
+        })),
+        currentIndex: currentIndex
+    };
+
+    const navHtml = `
+        <div id="floating-nav-${exerciseType}" class="floating-nav" data-exercise="${exerciseType}">
+            <div class="floating-nav-header" onclick="app.toggleFloatingNav('${exerciseType}')">
+                <span class="floating-nav-title">${config.name}导航</span>
+                <span class="floating-nav-toggle">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 6l4 4 4-4" class="nav-arrow"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="floating-nav-content">
+                ${items.map((item, idx) => `
+                    <div class="floating-nav-item ${idx === currentIndex ? 'current' : ''}"
+                        data-index="${idx}"
+                        onclick="app.jumpToExerciseItem('${exerciseType}', ${idx})">
+                        <span class="nav-item-status status-unanswered"></span>
+                        <span class="nav-item-label">${item.label}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    // 添加到页面
+    const navContainer = document.createElement('div');
+    navContainer.innerHTML = navHtml;
+    document.body.appendChild(navContainer.firstElementChild);
+
+    this.injectFloatingNavStyles();
+};
+
+WordCollectionApp.prototype.updateFloatingNav = function(exerciseType, statusMap) {
+    const navState = this.floatingNavStates[exerciseType];
+    if (!navState) return;
+
+    const nav = document.getElementById(`floating-nav-${exerciseType}`);
+    if (!nav) return;
+
+    Object.entries(statusMap).forEach(([index, status]) => {
+        const idx = parseInt(index, 10);
+        if (navState.items[idx]) {
+            navState.items[idx].status = status;
+        }
+
+        const itemEl = nav.querySelector(`.floating-nav-item[data-index="${idx}"] .nav-item-status`);
+        if (itemEl) {
+            itemEl.className = `nav-item-status status-${status}`;
+        }
+    });
+
+    // 保存进度
+    Storage.set(`navState_${exerciseType}`, navState);
+};
+
+WordCollectionApp.prototype.toggleFloatingNav = function(exerciseType) {
+    const nav = document.getElementById(`floating-nav-${exerciseType}`);
+    if (!nav) return;
+
+    const navState = this.floatingNavStates[exerciseType];
+    if (!navState) return;
+
+    navState.collapsed = !navState.collapsed;
+    nav.classList.toggle('collapsed', navState.collapsed);
+
+    // 保存状态
+    Storage.set(`navCollapsed_${exerciseType}`, navState.collapsed);
+};
+
+WordCollectionApp.prototype.jumpToExerciseItem = function(exerciseType, index) {
+    const navState = this.floatingNavStates[exerciseType];
+    if (!navState || !navState.items[index]) return;
+
+    navState.currentIndex = index;
+
+    // 更新当前项高亮
+    const nav = document.getElementById(`floating-nav-${exerciseType}`);
+    if (nav) {
+        nav.querySelectorAll('.floating-nav-item').forEach((el, idx) => {
+            el.classList.toggle('current', idx === index);
+        });
+    }
+
+    // 触发跳转事件
+    this.emit('navItemClicked', { exerciseType, index });
+
+    // 各题型具体的跳转逻辑由对应页面处理
+    this.scrollToExerciseItem(exerciseType, index);
+};
+
+WordCollectionApp.prototype.scrollToExerciseItem = function(exerciseType, index) {
+    const targetEl = document.querySelector(`[data-exercise-item="${exerciseType}-${index}"]`);
+    if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+};
+
+WordCollectionApp.prototype.injectFloatingNavStyles = function() {
+    if (document.getElementById('floating-nav-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'floating-nav-styles';
+    style.textContent = `
+        .floating-nav {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 160px;
+            background: var(--card-bg, #fff);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            z-index: 1000;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .floating-nav.collapsed {
+            width: 48px;
+        }
+        .floating-nav.collapsed .floating-nav-content {
+            display: none;
+        }
+        .floating-nav.collapsed .floating-nav-title {
+            display: none;
+        }
+        .floating-nav.collapsed .nav-arrow {
+            transform: rotate(180deg);
+        }
+        .floating-nav-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: var(--primary-color, #4a90d9);
+            color: #fff;
+            cursor: pointer;
+            user-select: none;
+        }
+        .floating-nav-title {
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .floating-nav-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .floating-nav-content {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .floating-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 12px;
+        }
+        .floating-nav-item:hover {
+            background: var(--hover-bg, #f0f0f0);
+        }
+        .floating-nav-item.current {
+            background: var(--primary-light, #e3f2fd);
+            font-weight: 500;
+        }
+        .nav-item-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .nav-item-status.status-unanswered {
+            background: #ccc;
+        }
+        .nav-item-status.status-correct {
+            background: #4caf50;
+        }
+        .nav-item-status.status-wrong {
+            background: #f44336;
+        }
+        .nav-item-label {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        @media (max-width: 768px) {
+            .floating-nav {
+                right: 10px;
+                width: 140px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+WordCollectionApp.prototype.saveCurrentExercise = function(exerciseType, data) {
+    const config = this.exerciseTypes[exerciseType];
+    if (!config) {
+        console.warn(`[WordCollectionApp] 未知题型: ${exerciseType}`);
+        return false;
+    }
+
+    const timestamp = Date.now();
+    const saveKey = `saved_${exerciseType}`;
+
+    let saveData = {
+        type: exerciseType,
+        typeName: config.name,
+        savedAt: timestamp,
+        difficulty: this.currentDifficulty[exerciseType],
+        customType: this.customTypes[exerciseType]
+    };
+
+    // 根据题型合并具体数据
+    switch (exerciseType) {
+        case 'practice':
+            saveData = this.buildPracticeSaveData(saveData, data);
+            break;
+        case 'reading':
+            saveData = this.buildReadingSaveData(saveData, data);
+            break;
+        case 'translation':
+            saveData = this.buildTranslationSaveData(saveData, data);
+            break;
+        case 'cloze':
+            saveData = this.buildClozeSaveData(saveData, data);
+            break;
+        case 'writing':
+            saveData = this.buildWritingSaveData(saveData, data);
+            break;
+        case 'memory':
+            saveData = this.buildMemorySaveData(saveData, data);
+            break;
+        default:
+            saveData = { ...saveData, ...data };
+    }
+
+    // 获取已有保存列表
+    const savedList = Storage.get(saveKey) || [];
+
+    // 检查是否已存在相同内容（根据唯一标识）
+    const existingIndex = savedList.findIndex(item => item.id === saveData.id);
+    if (existingIndex >= 0) {
+        // 更新已有记录
+        savedList[existingIndex] = saveData;
+    } else {
+        // 添加新记录，限制最多保存50条
+        savedList.unshift(saveData);
+        if (savedList.length > 50) {
+            savedList.pop();
+        }
+    }
+
+    Storage.set(saveKey, savedList);
+
+    // 增加经验值奖励
+    if (typeof LevelSystem !== 'undefined') {
+        LevelSystem.addExp(5, `保存${config.name}`);
+    }
+
+    this.showToast(`${config.name} 已保存到"已保存"`);
+    this.emit('exerciseSaved', { exerciseType, data: saveData });
+
+    return true;
+};
+
+WordCollectionApp.prototype.buildPracticeSaveData = function(baseData, data) {
+    return {
+        ...baseData,
+        id: `practice_${data.word}_${Date.now()}`,
+        word: data.word,
+        sentence: data.sentence,
+        translation: data.translation || ''
+    };
+};
+
+WordCollectionApp.prototype.buildReadingSaveData = function(baseData, data) {
+    return {
+        ...baseData,
+        id: `reading_${data.articleId}_${Date.now()}`,
+        articleId: data.articleId,
+        title: data.title,
+        content: data.content,
+        questions: data.questions || []
+    };
+};
+
+WordCollectionApp.prototype.buildTranslationSaveData = function(baseData, data) {
+    return {
+        ...baseData,
+        id: `translation_${data.sentenceId}_${Date.now()}`,
+        sentenceId: data.sentenceId,
+        original: data.original,
+        translation: data.translation,
+        userAnswer: data.userAnswer || ''
+    };
+};
+
+WordCollectionApp.prototype.buildClozeSaveData = function(baseData, data) {
+    return {
+        ...baseData,
+        id: `cloze_${data.articleId}_${Date.now()}`,
+        articleId: data.articleId,
+        title: data.title,
+        article: data.article,
+        blanks: data.blanks || [],
+        answers: data.answers || [],
+        userAnswers: data.userAnswers || []
+    };
+};
+
+WordCollectionApp.prototype.buildWritingSaveData = function(baseData, data) {
+    return {
+        ...baseData,
+        id: `writing_${data.topicId}_${Date.now()}`,
+        topicId: data.topicId,
+        topic: data.topic,
+        requirements: data.requirements,
+        userEssay: data.userEssay || '',
+        wordCount: data.userEssay ? data.userEssay.length : 0
+    };
+};
+
+WordCollectionApp.prototype.buildMemorySaveData = function(baseData, data) {
+    return {
+        ...baseData,
+        id: `memory_${data.mode}_${Date.now()}`,
+        mode: data.mode,
+        words: data.words || [],
+        progress: data.progress || 0,
+        stats: data.stats || {},
+        currentIndex: data.currentIndex || 0
+    };
+};
+
+WordCollectionApp.prototype.getSavedExercises = function(exerciseType) {
+    if (exerciseType) {
+        return Storage.get(`saved_${exerciseType}`) || [];
+    }
+
+    const allSaved = [];
+    Object.keys(this.exerciseTypes).forEach(type => {
+        const list = Storage.get(`saved_${type}`) || [];
+        allSaved.push(...list);
+    });
+
+    // 按保存时间倒序排列
+    return allSaved.sort((a, b) => b.savedAt - a.savedAt);
+};
+
+WordCollectionApp.prototype.deleteSavedExercise = function(exerciseType, id) {
+    const saveKey = `saved_${exerciseType}`;
+    const savedList = Storage.get(saveKey) || [];
+    const filtered = savedList.filter(item => item.id !== id);
+    Storage.set(saveKey, filtered);
+    this.emit('exerciseDeleted', { exerciseType, id });
+    return true;
+};
+
+WordCollectionApp.prototype.getPracticeDifficultyParams = function(difficulty) {
+    const params = {
+        easy: {
+            sentenceLength: 'short',      // 短例句
+            wordFrequency: 'high',        // 常用词
+            maxWords: 8,
+            complexity: 'simple'
+        },
+        medium: {
+            sentenceLength: 'standard',   // 标准例句
+            wordFrequency: 'medium',      // 中频词
+            maxWords: 15,
+            complexity: 'standard'
+        },
+        hard: {
+            sentenceLength: 'long',       // 长难句
+            wordFrequency: 'low',         // 低频词
+            maxWords: 30,
+            complexity: 'complex'
+        }
+    };
+    return params[difficulty] || params.medium;
+};
+
+WordCollectionApp.prototype.getTranslationDifficultyParams = function(difficulty) {
+    const params = {
+        easy: {
+            sentenceLength: 'short',      // 短句
+            vocabularyLevel: 'simple',    // 简单词
+            grammarComplexity: 'simple',
+            maxLength: 50
+        },
+        medium: {
+            sentenceLength: 'standard',   // 标准句
+            vocabularyLevel: 'standard',  // 标准词
+            grammarComplexity: 'standard',
+            maxLength: 100
+        },
+        hard: {
+            sentenceLength: 'long',       // 长句
+            vocabularyLevel: 'advanced',  // 复杂词
+            grammarComplexity: 'complex', // 复杂结构
+            maxLength: 200
+        }
+    };
+    return params[difficulty] || params.medium;
+};
+
+WordCollectionApp.prototype.getWritingDifficultyParams = function(difficulty) {
+    const params = {
+        easy: {
+            wordCount: 150,               // 150词
+            topicComplexity: 'simple',    // 简单话题
+            requirementCount: 2,
+            allowSimpleVocabulary: true
+        },
+        medium: {
+            wordCount: 200,               // 200词
+            topicComplexity: 'standard',  // 标准话题
+            requirementCount: 3,
+            allowSimpleVocabulary: false
+        },
+        hard: {
+            wordCount: 250,               // 250词
+            topicComplexity: 'abstract',  // 抽象话题
+            requirementCount: 4,
+            allowSimpleVocabulary: false
+        }
+    };
+    return params[difficulty] || params.medium;
+};
+
+WordCollectionApp.prototype.getMemoryDifficultyParams = function(difficulty) {
+    const params = {
+        easy: {
+            wordFrequency: 'high',        // 高频词
+            batchSize: 10,
+            reviewInterval: 24 * 60 * 60 * 1000, // 1天
+            hintLevel: 'full'
+        },
+        medium: {
+            wordFrequency: 'medium',      // 中频词
+            batchSize: 15,
+            reviewInterval: 12 * 60 * 60 * 1000, // 12小时
+            hintLevel: 'partial'
+        },
+        hard: {
+            wordFrequency: 'low',         // 低频词
+            batchSize: 20,
+            reviewInterval: 6 * 60 * 60 * 1000,  // 6小时
+            hintLevel: 'none'
+        }
+    };
+    return params[difficulty] || params.medium;
+};
+
+WordCollectionApp.prototype.getDifficultyParams = function(exerciseType, difficulty) {
+    const methodMap = {
+        practice: 'getPracticeDifficultyParams',
+        reading: 'getReadingDifficultyParams',
+        translation: 'getTranslationDifficultyParams',
+        cloze: 'getClozeDifficultyParams',
+        writing: 'getWritingDifficultyParams',
+        memory: 'getMemoryDifficultyParams'
+    };
+
+    const methodName = methodMap[exerciseType];
+    if (methodName && typeof this[methodName] === 'function') {
+        return this[methodName](difficulty);
+    }
+
+    // 默认返回
+    return { difficulty };
+};
+
+WordCollectionApp.prototype.getReadingDifficultyParams = function(difficulty) {
+    const params = {
+        easy: {
+            articleLength: 'short',
+            vocabularyLevel: 'simple',
+            questionCount: 3,
+            hasHeading: true
+        },
+        medium: {
+            articleLength: 'standard',
+            vocabularyLevel: 'standard',
+            questionCount: 4,
+            hasHeading: true
+        },
+        hard: {
+            articleLength: 'long',
+            vocabularyLevel: 'advanced',
+            questionCount: 5,
+            hasHeading: false
+        }
+    };
+    return params[difficulty] || params.medium;
+};
+
+WordCollectionApp.prototype.getClozeDifficultyParams = function(difficulty) {
+    const params = {
+        easy: {
+            blankCount: 5,
+            wordPoolSize: 8,
+            articleLength: 'short',
+            distractorSimilarity: 'low'
+        },
+        medium: {
+            blankCount: 10,
+            wordPoolSize: 15,
+            articleLength: 'standard',
+            distractorSimilarity: 'medium'
+        },
+        hard: {
+            blankCount: 15,
+            wordPoolSize: 20,
+            articleLength: 'long',
+            distractorSimilarity: 'high'
+        }
+    };
+    return params[difficulty] || params.medium;
+};
+
+WordCollectionApp.prototype.setupPhotoUploadForBlank = function(blankId, exerciseType) {
+    const config = this.exerciseTypes[exerciseType];
+    if (!config || !config.hasPhotoUpload) {
+        console.warn(`[WordCollectionApp] ${exerciseType} 不支持拍照上传`);
+        return;
+    }
+
+    const container = document.getElementById(blankId);
+    if (!container) {
+        console.warn(`[WordCollectionApp] 找不到填空容器: ${blankId}`);
+        return;
+    }
+
+    // 初始化拍照数据存储
+    if (!this.photoUploadData[exerciseType]) {
+        this.photoUploadData[exerciseType] = {};
+    }
+
+    // 创建拍照上传UI
+    const uploadHtml = `
+        <div class="photo-upload-wrapper" data-blank="${blankId}">
+            <input
+                type="file"
+                id="photo-input-${blankId}"
+                class="photo-input"
+                accept="image/*"
+                capture="environment"
+                style="display: none;"
+                onchange="app.handlePhotoUpload('${blankId}', '${exerciseType}', this)"
+            >
+            <button
+                class="photo-upload-btn"
+                onclick="document.getElementById('photo-input-${blankId}').click()"
+                title="拍照上传">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="6" width="18" height="12" rx="2"/>
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M8 6l1.5-2h5L16 6"/>
+                </svg>
+                <span>拍照</span>
+            </button>
+            <div class="photo-preview" id="photo-preview-${blankId}" style="display: none;">
+                <img src="" alt="拍照预览">
+                <button class="photo-remove-btn" onclick="app.removePhoto('${blankId}', '${exerciseType}')">×</button>
+            </div>
+            <div class="photo-processing" id="photo-processing-${blankId}" style="display: none;">
+                <span class="processing-spinner"></span>
+                <span>识别中...</span>
+            </div>
+        </div>
+    `;
+
+    // 将上传按钮添加到容器
+    const uploadWrapper = document.createElement('div');
+    uploadWrapper.innerHTML = uploadHtml;
+    container.appendChild(uploadWrapper);
+
+    this.injectPhotoUploadStyles();
+};
+
+WordCollectionApp.prototype.handlePhotoUpload = function(blankId, exerciseType, inputElement) {
+    const file = inputElement.files[0];
+    if (!file) return;
+
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+        this.showToast('请选择图片文件');
+        return;
+    }
+
+    // 检查文件大小（最大 5MB）
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+        this.showToast('图片大小不能超过5MB');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const imageData = e.target.result;
+        this.processPhotoForBlank(blankId, imageData, exerciseType);
+    };
+    reader.onerror = () => {
+        this.showToast('图片读取失败，请重试');
+    };
+    reader.readAsDataURL(file);
+};
+
+WordCollectionApp.prototype.processPhotoForBlank = function(blankId, imageData, exerciseType) {
+    // 显示处理中状态
+    const processingEl = document.getElementById(`photo-processing-${blankId}`);
+    const previewEl = document.getElementById(`photo-preview-${blankId}`);
+    if (processingEl) processingEl.style.display = 'flex';
+    if (previewEl) previewEl.style.display = 'none';
+
+    // 存储图片数据
+    if (!this.photoUploadData[exerciseType]) {
+        this.photoUploadData[exerciseType] = {};
+    }
+    this.photoUploadData[exerciseType][blankId] = imageData;
+
+    // 模拟OCR识别过程（实际项目中应调用OCR API）
+    // 这里使用setTimeout模拟异步识别
+    setTimeout(() => {
+        // 模拟识别结果
+        const mockRecognizedText = this.mockOCRRecognize(imageData);
+
+        // 填入识别结果
+        const inputEl = document.querySelector(`#${blankId} input, #${blankId} textarea`);
+        if (inputEl) {
+            inputEl.value = mockRecognizedText;
+            // 触发input事件以更新状态
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        // 显示预览
+        if (previewEl) {
+            const img = previewEl.querySelector('img');
+            if (img) img.src = imageData;
+            previewEl.style.display = 'block';
+        }
+        if (processingEl) processingEl.style.display = 'none';
+
+        this.showToast('识别完成');
+
+        this.emit('photoProcessed', {
+            exerciseType,
+            blankId,
+            imageData,
+            recognizedText: mockRecognizedText
+        });
+    }, 1500);
+};
+
+WordCollectionApp.prototype.mockOCRRecognize = function(imageData) {
+    // 实际项目中，这里应该调用OCR服务：
+    // return await this.callOCRService(imageData);
+
+    // 模拟返回示例文本
+    const mockTexts = [
+        'The quick brown fox jumps over the lazy dog.',
+        'To be or not to be, that is the question.',
+        'All roads lead to Rome.',
+        'Practice makes perfect.',
+        'Where there is a will, there is a way.'
+    ];
+    return mockTexts[Math.floor(Math.random() * mockTexts.length)];
+};
+
+WordCollectionApp.prototype.callOCRService = async function(imageData) {
+    try {
+        const response = await fetch('/api/ocr', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ image: imageData })
+        });
+        const result = await response.json();
+        return result.text || '';
+    } catch (error) {
+        console.error('[WordCollectionApp] OCR识别失败:', error);
+        return '';
+    }
+};
+
+WordCollectionApp.prototype.removePhoto = function(blankId, exerciseType) {
+    // 清除存储的数据
+    if (this.photoUploadData[exerciseType]) {
+        delete this.photoUploadData[exerciseType][blankId];
+    }
+
+    // 隐藏预览
+    const previewEl = document.getElementById(`photo-preview-${blankId}`);
+    if (previewEl) {
+        previewEl.style.display = 'none';
+        const img = previewEl.querySelector('img');
+        if (img) img.src = '';
+    }
+
+    // 清空对应输入框
+    const inputEl = document.querySelector(`#${blankId} input, #${blankId} textarea`);
+    if (inputEl) {
+        inputEl.value = '';
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // 重置文件输入
+    const fileInput = document.getElementById(`photo-input-${blankId}`);
+    if (fileInput) fileInput.value = '';
+
+    this.emit('photoRemoved', { exerciseType, blankId });
+};
+
+WordCollectionApp.prototype.injectPhotoUploadStyles = function() {
+    if (document.getElementById('photo-upload-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'photo-upload-styles';
+    style.textContent = `
+        .photo-upload-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .photo-upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border: 1px dashed var(--border-color, #ccc);
+            border-radius: 6px;
+            background: var(--btn-bg, #fafafa);
+            color: var(--text-secondary, #666);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .photo-upload-btn:hover {
+            border-color: var(--primary-color, #4a90d9);
+            color: var(--primary-color, #4a90d9);
+            background: var(--primary-light, #f0f7ff);
+        }
+        .photo-preview {
+            position: relative;
+            display: inline-block;
+        }
+        .photo-preview img {
+            max-width: 80px;
+            max-height: 60px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+        .photo-remove-btn {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 18px;
+            height: 18px;
+            border: none;
+            border-radius: 50%;
+            background: #f44336;
+            color: #fff;
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .photo-processing {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary, #666);
+        }
+        .processing-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border-color, #e0e0e0);
+            border-top-color: var(--primary-color, #4a90d9);
+            border-radius: 50%;
+            animation: photo-spin 0.8s linear infinite;
+        }
+        @keyframes photo-spin {
+            to { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+WordCollectionApp.prototype.reloadExerciseByType = function(exerciseType) {
+    // 触发重新加载事件，由各页面监听器处理具体逻辑
+    this.emit('reloadExercise', {
+        exerciseType,
+        difficulty: this.currentDifficulty[exerciseType],
+        customType: this.customTypes[exerciseType],
+        difficultyParams: this.getDifficultyParams(exerciseType, this.currentDifficulty[exerciseType])
+    });
+};
+
+WordCollectionApp.prototype.showToast = function(message, duration = 2000) {
+    // 如果已有toast，先移除
+    const existingToast = document.getElementById('app-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.className = 'app-toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // 显示动画
+    requestAnimationFrame(() => {
+        toast.classList.add('show');
+    });
+
+    // 自动隐藏
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+
+    this.injectToastStyles();
+};
+
+WordCollectionApp.prototype.injectToastStyles = function() {
+    if (document.getElementById('app-toast-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'app-toast-styles';
+    style.textContent = `
+        .app-toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            font-size: 14px;
+            border-radius: 20px;
+            z-index: 9999;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .app-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+WordCollectionApp.prototype.emit = function(event, data) {
+    if (!this._eventListeners) this._eventListeners = {};
+    const listeners = this._eventListeners[event];
+    if (listeners) {
+        listeners.forEach(callback => {
+            try {
+                callback(data);
+            } catch (e) {
+                console.error(`[WordCollectionApp] 事件处理错误 (${event}):`, e);
+            }
+        });
+    }
+};
+
+WordCollectionApp.prototype.on = function(event, callback) {
+    if (!this._eventListeners) this._eventListeners = {};
+    if (!this._eventListeners[event]) this._eventListeners[event] = [];
+    this._eventListeners[event].push(callback);
+};
+
+WordCollectionApp.prototype.off = function(event, callback) {
+    if (!this._eventListeners || !this._eventListeners[event]) return;
+    const idx = this._eventListeners[event].indexOf(callback);
+    if (idx >= 0) this._eventListeners[event].splice(idx, 1);
+};
+
+WordCollectionApp.prototype.restoreUserPreferences = function() {
+    // 恢复难度设置
+    Object.keys(this.exerciseTypes).forEach(type => {
+        const savedDifficulty = Storage.get(`difficulty_${type}`);
+        if (savedDifficulty && this.exerciseTypes[type].difficulties.includes(savedDifficulty)) {
+            this.currentDifficulty[type] = savedDifficulty;
+        }
+    });
+
+    // 恢复自定义类型
+    Object.keys(this.exerciseTypes).forEach(type => {
+        const savedType = Storage.get(`customType_${type}`);
+        if (savedType) {
+            this.customTypes[type] = savedType;
+        }
+    });
+
+    // 恢复翻译显示设置
+    Object.keys(this.exerciseTypes).forEach(type => {
+        const savedShow = Storage.get(`showTranslation_${type}`);
+        if (savedShow !== null) {
+            this.showTranslation[type] = savedShow;
+        }
+    });
+
+    // 恢复悬浮导航状态
+    Object.keys(this.exerciseTypes).forEach(type => {
+        const savedCollapsed = Storage.get(`navCollapsed_${type}`);
+        if (savedCollapsed !== null && this.floatingNavStates[type]) {
+            this.floatingNavStates[type].collapsed = savedCollapsed;
+        }
+    });
+
+    console.log('[WordCollectionApp] 用户偏好设置已恢复');
+};
+
+WordCollectionApp.prototype.initExerciseConfigSystem = function() {
+    // 恢复用户偏好
+    this.restoreUserPreferences();
+
+    // 监听题型切换事件，自动清理上一个题型的UI
+    this.on('exerciseTypeChanged', ({ from, to }) => {
+        // 收起上一个题型的悬浮导航
+        if (from && this.exerciseTypes[from] && this.exerciseTypes[from].hasFloatingNav) {
+            const nav = document.getElementById(`floating-nav-${from}`);
+            if (nav) nav.remove();
+        }
+    });
+
+    console.log('[WordCollectionApp] 题型配置系统初始化完成');
+};
+
+WordCollectionApp.prototype.analyzeReadingMistakes = async function() {
+    if (!this.currentPassage || !this.readingAnswers) return;
+
+    const questions = this.currentPassage.questions;
+    const wrongQuestions = [];
+
+    questions.forEach((q, idx) => {
+        const userAnswer = this.readingAnswers[idx];
+        const isCorrect = userAnswer === q.correct;
+        if (!isCorrect) {
+            wrongQuestions.push({
+                index: idx,
+                question: q.text,
+                questionCn: q.textCn || '',
+                userAnswer: userAnswer !== undefined ? q.options[userAnswer] : '未作答',
+                correctAnswer: q.options[q.correct],
+                options: q.options,
+                passage: this.currentPassage.text || this.currentPassage.paragraphs?.map(p => p.en).join('\n') || ''
+            });
+        }
+    });
+
+    if (wrongQuestions.length === 0) {
+        // 全对，显示祝贺
+        const resultEl = document.getElementById('reading-result');
+        const existingAi = resultEl.querySelector('.ai-mistake-analysis');
+        if (existingAi) existingAi.remove();
+        return;
+    }
+
+    this.showLoading('AI正在分析错题，请稍候...');
+
+    try {
+        const analyses = [];
+        for (const wq of wrongQuestions) {
+            const analysis = await this.analyzeSingleMistake(
+                wq.question,
+                wq.userAnswer,
+                wq.correctAnswer,
+                wq.passage
+            );
+            analyses.push({ ...wq, analysis });
+        }
+
+        // 生成个性化学习建议
+        const mistakeTypes = analyses.map(a => a.analysis.errorType);
+        const typeCount = {};
+        mistakeTypes.forEach(t => { typeCount[t] = (typeCount[t] || 0) + 1; });
+        const mainWeakness = Object.entries(typeCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '综合理解';
+
+        const summary = {
+            totalWrong: wrongQuestions.length,
+            mainWeakness: mainWeakness,
+            analyses: analyses,
+            studyAdvice: this.generateStudyAdvice(typeCount)
+        };
+
+        this.renderMistakeAnalysis(summary);
+
+        // 将错题加入错题本（已带有AI分析）
+        analyses.forEach(a => {
+            this.addWrongRecord({
+                type: 'reading',
+                word: a.correctAnswer,
+                meaning: a.questionCn,
+                question: a.question,
+                correctAnswer: a.correctAnswer,
+                userAnswer: a.userAnswer,
+                aiAnalysis: a.analysis,
+                passageTitle: this.currentPassage.title
+            });
+        });
+    } catch (err) {
+        console.error('AI错题分析失败:', err);
+    } finally {
+        this.hideLoading();
+    }
+}
+
+WordCollectionApp.prototype.analyzeSingleMistake = async function(question, userAnswer, correctAnswer, passage) {
+    const apiKey = this.settings.apiKey;
+    if (!apiKey) {
+        return {
+            errorType: '理解偏差',
+            knowledgePoint: '阅读理解',
+            reason: '未配置API密钥，使用默认分析',
+            suggestion: '建议仔细阅读文章，定位关键信息'
+        };
+    }
+
+    const prompt = `你是一位考研英语阅读辅导专家。请分析以下错题，指出错误原因并给出改进建议。
+
+文章片段：
+${passage.substring(0, 1500)}
+
+题目：${question}
+用户答案：${userAnswer}
+正确答案：${correctAnswer}
+
+请以JSON格式返回：
+{
+  "errorType": "错误类型（词汇/语法/理解/推理/细节/主旨）",
+  "knowledgePoint": "涉及的知识点",
+  "reason": "详细的错误原因分析（中文，100字以内）",
+  "suggestion": "针对性的改进建议（中文，100字以内）",
+  "keySentence": "文章中对应的关键句"
+}`;
+
+    try {
+        const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'qwen-turbo',
+                input: {
+                    messages: [
+                        { role: 'system', content: '你是考研英语阅读理解专家，擅长分析学生错题并提供针对性建议。' },
+                        { role: 'user', content: prompt }
+                    ]
+                },
+                parameters: {
+                    result_format: 'message'
+                }
+            })
+        });
+
+        if (!response.ok) throw new Error('API请求失败');
+
+        const data = await response.json();
+        const content = data.output?.choices?.[0]?.message?.content || '';
+
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const result = JSON.parse(jsonMatch[0]);
+            return {
+                errorType: result.errorType || '理解偏差',
+                knowledgePoint: result.knowledgePoint || '阅读理解',
+                reason: result.reason || '未能准确理解题意',
+                suggestion: result.suggestion || '建议多做同类题型练习',
+                keySentence: result.keySentence || ''
+            };
+        }
+    } catch (e) {
+        console.error('AI分析单题失败:', e);
+    }
+
+    return {
+        errorType: '理解偏差',
+        knowledgePoint: '阅读理解',
+        reason: '未能准确把握题目要求和文章信息',
+        suggestion: '建议重新阅读相关段落，标注关键词句'
+    };
+}
+
+WordCollectionApp.prototype.generateStudyAdvice = function(typeCount) {
+    const adviceMap = {
+        '词汇': '建议加强核心词汇积累，特别是熟词僻义',
+        '语法': '建议复习长难句分析方法，理清句子结构',
+        '理解': '建议提升整体阅读速度和理解能力',
+        '推理': '建议练习根据上下文推断隐含意义',
+        '细节': '建议养成定位原文、核对细节的习惯',
+        '主旨': '建议练习概括段落大意和全文主旨'
+    };
+
+    const advices = Object.entries(typeCount).map(([type, count]) => {
+        const baseAdvice = adviceMap[type] || '建议加强相关知识点练习';
+        return `${type}类错误${count}道：${baseAdvice}`;
+    });
+
+    return advices;
+}
+
+WordCollectionApp.prototype.renderMistakeAnalysis = function(analysis) {
+    const resultEl = document.getElementById('reading-result');
+    if (!resultEl) return;
+
+    // 移除旧的AI分析
+    const existing = resultEl.querySelector('.ai-mistake-analysis');
+    if (existing) existing.remove();
+
+    let html = `
+        <div class="ai-mistake-analysis" style="margin-top: 24px; padding: 20px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border);">
+            <h3 style="color: var(--accent); margin-bottom: 16px;">🤖 AI错题分析报告</h3>
+            <div style="margin-bottom: 16px; padding: 12px; background: var(--bg); border-radius: 8px;">
+                <div style="font-weight: 600; margin-bottom: 8px;">主要薄弱点：${analysis.mainWeakness}</div>
+                <div style="color: var(--text-muted); font-size: 14px;">共${analysis.totalWrong}道错题</div>
+            </div>
+    `;
+
+    analysis.analyses.forEach((item, idx) => {
+        const a = item.analysis;
+        html += `
+            <div style="margin-bottom: 16px; padding: 16px; background: var(--bg); border-radius: 8px; border-left: 4px solid var(--error);">
+                <div style="font-weight: 600; margin-bottom: 8px;">错题 ${idx + 1}：${a.errorType}</div>
+                <div style="margin-bottom: 6px; color: var(--text-muted); font-size: 14px;">📖 ${item.question.substring(0, 60)}...</div>
+                <div style="margin-bottom: 6px;"><span style="color: var(--error);">你的答案：${item.userAnswer}</span> → <span style="color: var(--success);">正确答案：${item.correctAnswer}</span></div>
+                <div style="margin-bottom: 6px; font-size: 14px;"><strong>错误原因：</strong>${a.reason}</div>
+                <div style="font-size: 14px; color: var(--accent);"><strong>💡 改进建议：</strong>${a.suggestion}</div>
+                ${a.keySentence ? `<div style="margin-top: 8px; padding: 8px; background: rgba(255,215,0,0.1); border-radius: 4px; font-size: 13px;">📌 关键句：${a.keySentence}</div>` : ''}
+            </div>
+        `;
+    });
+
+    // 学习建议
+    html += `
+            <div style="margin-top: 16px; padding: 12px; background: rgba(0,123,255,0.05); border-radius: 8px;">
+                <div style="font-weight: 600; margin-bottom: 8px; color: var(--accent);">📋 针对性学习建议</div>
+                ${analysis.studyAdvice.map(adv => `<div style="font-size: 14px; margin-bottom: 4px;">• ${adv}</div>`).join('')}
+            </div>
+        </div>
+    `;
+
+    resultEl.insertAdjacentHTML('beforeend', html);
+}
+
+WordCollectionApp.prototype.submitWritingWithAIGrade = async function() {
+    const essay = this.getWritingInputText();
+    if (!essay) {
+        alert('请输入或上传作文内容');
+        return;
+    }
+    if (!this.currentWritingPrompt) {
+        alert('请先生成作文题目');
+        return;
+    }
+
+    const wordCount = essay.trim().split(/\s+/).length;
+    const difficulty = this.currentWritingPrompt.difficulty || 'medium';
+    const topic = this.currentWritingPrompt.prompt || '';
+
+    this.showLoading('AI正在评分，请稍候...');
+
+    try {
+        const result = await this.callAIWritingGrade(topic, essay, wordCount, difficulty);
+        this.renderWritingGradeResult(result);
+
+        // 保存到学习记录
+        Storage.addActivity({
+            type: result.totalScore >= 60 ? 'correct' : 'wrong',
+            message: `作文练习：${this.currentWritingPrompt.title || '作文'}，得分 ${result.totalScore}分`
+        });
+
+        // 学习助手Agent反馈
+        const writingScore = result.totalScore || 0;
+        const writingCorrect = writingScore >= 60 ? 1 : 0;
+        const writingWrongItems = writingScore < 60 ? [{
+            score: writingScore,
+            correctAnswer: '',
+            userAnswer: ''
+        }] : [];
+        this.showAgentFeedback('writing', writingScore, writingCorrect, 1, writingWrongItems);
+    } catch (err) {
+        console.error('AI作文评分失败:', err);
+        alert('评分失败，请检查API配置或稍后重试');
+    } finally {
+        this.hideLoading();
+    }
+}
+
+WordCollectionApp.prototype.callAIWritingGrade = async function(topic, essay, wordCount, difficulty) {
+    const apiKey = this.settings.apiKey;
+
+    // 如果有后端agentClient，优先使用后端
+    if (typeof agentClient !== 'undefined' && agentClient.evaluateWriting) {
+        try {
+            const backendResult = await agentClient.evaluateWriting(topic, essay);
+            if (backendResult.success && backendResult.data && backendResult.data.evaluation) {
+                const ev = backendResult.data.evaluation;
+                return {
+                    totalScore: ev.totalScore || 0,
+                    dimensions: {
+                        vocabulary: ev.vocabularyScore || 0,
+                        grammar: ev.languageScore || 0,
+                        structure: ev.structureScore || 0,
+                        content: ev.contentScore || 0
+                    },
+                    detailedComment: ev.overallComment || '',
+                    suggestions: ev.suggestions || [],
+                    strengths: ev.strengths || [],
+                    weaknesses: ev.weaknesses || [],
+                    grammarErrors: ev.grammarErrors || [],
+                    improvedVersion: ev.improvedVersion || ''
+                };
+            }
+        } catch (e) {
+            console.log('后端评分失败，尝试直接调用AI API');
+        }
+    }
+
+    if (!apiKey) {
+        throw new Error('未配置API密钥');
+    }
+
+    const difficultyDesc = { easy: '简单', medium: '中等', hard: '困难' };
+
+    const prompt = `你是一位考研英语作文评分专家。请对以下作文进行评分和点评。
+
+作文题目：${topic}
+难度：${difficultyDesc[difficulty] || '中等'}
+字数：${wordCount}
+
+作文内容：
+${essay}
+
+请严格按照以下JSON格式返回（分数均为0-100分制）：
+{
+  "totalScore": 总分,
+  "dimensions": {
+    "vocabulary": 词汇运用分数,
+    "grammar": 语法正确性分数,
+    "structure": 文章结构分数,
+    "content": 内容充实度分数
+  },
+  "detailedComment": "总体评价（中文，200字以内）",
+  "suggestions": ["具体改进建议1", "具体改进建议2", "具体改进建议3"],
+  "strengths": ["优点1", "优点2"],
+  "weaknesses": ["不足1", "不足2"],
+  "grammarErrors": [
+    {"original": "错误原文", "correction": "正确写法", "explanation": "错误说明", "type": "错误类型"}
+  ],
+  "improvedVersion": "改进后的作文全文"
+}`;
+
+    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: 'qwen-turbo',
+            input: {
+                messages: [
+                    { role: 'system', content: '你是考研英语作文评分专家，严格按照评分标准给出公正评分和建设性意见。' },
+                    { role: 'user', content: prompt }
+                ]
+            },
+            parameters: {
+                result_format: 'message'
+            }
+        })
+    });
+
+    if (!response.ok) throw new Error('API请求失败');
+
+    const data = await response.json();
+    const content = data.output?.choices?.[0]?.message?.content || '';
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        return {
+            totalScore: result.totalScore || 0,
+            dimensions: {
+                vocabulary: result.dimensions?.vocabulary || 0,
+                grammar: result.dimensions?.grammar || 0,
+                structure: result.dimensions?.structure || 0,
+                content: result.dimensions?.content || 0
+            },
+            detailedComment: result.detailedComment || '',
+            suggestions: result.suggestions || [],
+            strengths: result.strengths || [],
+            weaknesses: result.weaknesses || [],
+            grammarErrors: result.grammarErrors || [],
+            improvedVersion: result.improvedVersion || ''
+        };
+    }
+
+    throw new Error('无法解析AI评分结果');
+}
+
+WordCollectionApp.prototype.renderWritingGradeResult = function(result) {
+    const container = document.getElementById('writing-evaluation');
+    if (!container) return;
+
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior: 'smooth' });
+
+    // 总分
+    const totalEl = document.getElementById('total-score');
+    if (totalEl) totalEl.textContent = result.totalScore;
+
+    // 各维度分数条
+    const dims = result.dimensions;
+    const dimMap = [
+        { id: 'vocabulary-score', barId: 'vocabulary-score-bar', val: dims.vocabulary, max: 100, label: '词汇运用' },
+        { id: 'grammar-score', barId: 'grammar-score-bar', val: dims.grammar, max: 100, label: '语法正确' },
+        { id: 'structure-score', barId: 'structure-score-bar', val: dims.structure, max: 100, label: '文章结构' },
+        { id: 'content-score', barId: 'content-score-bar', val: dims.content, max: 100, label: '内容充实' }
+    ];
+
+    dimMap.forEach(d => {
+        const scoreEl = document.getElementById(d.id);
+        const barEl = document.getElementById(d.barId);
+        if (scoreEl) scoreEl.textContent = `${d.val}/${d.max}`;
+        if (barEl) barEl.style.width = `${(d.val / d.max) * 100}%`;
+    });
+
+    // 总体评价
+    const commentEl = document.getElementById('overall-comment');
+    if (commentEl) commentEl.textContent = result.detailedComment;
+
+    // 优点和不足
+    const renderList = (id, items) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = (items || []).map(i => `<li>${i}</li>`).join('');
+    };
+    renderList('strengths-list', result.strengths);
+    renderList('weaknesses-list', result.weaknesses);
+    renderList('suggestions-list', result.suggestions);
+
+    // 语法错误表
+    const errors = result.grammarErrors || [];
+    const errorSection = document.getElementById('grammar-errors-section');
+    const errorBody = document.getElementById('grammar-errors-body');
+    if (errorSection && errorBody) {
+        if (errors.length > 0) {
+            errorSection.style.display = 'block';
+            errorBody.innerHTML = errors.map(e =>
+                `<tr><td>${e.original || ''}</td><td>${e.correction || ''}</td><td>${e.explanation || ''}</td><td>${e.type || ''}</td></tr>`
+            ).join('');
+        } else {
+            errorSection.style.display = 'none';
+        }
+    }
+
+    // 改进版本
+    const improvedEl = document.getElementById('improved-text');
+    if (improvedEl) {
+        improvedEl.innerHTML = result.improvedVersion
+            ? `<p>${result.improvedVersion.replace(/\n/g, '</p><p>')}</p>` : '<p>无改进版本</p>';
+    }
+
+    // 如果没有对应的DOM元素，动态构建评分面板
+    if (!totalEl) {
+        this.renderWritingGradeResultDynamic(result, container);
+    }
+}
+
+WordCollectionApp.prototype.renderWritingGradeResultDynamic = function(result, container) {
+    const dims = result.dimensions;
+    const getColor = (score) => score >= 80 ? 'var(--success)' : score >= 60 ? 'var(--accent)' : 'var(--error)';
+
+    let html = `
+        <div class="writing-grade-panel" style="padding: 20px;">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <div style="font-size: 48px; font-weight: 700; color: ${getColor(result.totalScore)};">${result.totalScore}</div>
+                <div style="color: var(--text-muted);">总分 · 100分制</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+    `;
+
+    const dimLabels = { vocabulary: '词汇运用', grammar: '语法正确', structure: '文章结构', content: '内容充实' };
+    Object.entries(dims).forEach(([key, val]) => {
+        html += `
+            <div style="padding: 12px; background: var(--bg); border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <span>${dimLabels[key]}</span>
+                    <span style="font-weight: 600; color: ${getColor(val)};">${val}分</span>
+                </div>
+                <div style="height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+                    <div style="width: ${val}%; height: 100%; background: ${getColor(val)}; transition: width 0.5s;"></div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+
+    if (result.detailedComment) {
+        html += `
+            <div style="margin-bottom: 20px; padding: 16px; background: var(--bg); border-radius: 8px;">
+                <div style="font-weight: 600; margin-bottom: 8px;">总体评价</div>
+                <div style="line-height: 1.6;">${result.detailedComment}</div>
+            </div>
+        `;
+    }
+
+    if (result.suggestions && result.suggestions.length > 0) {
+        html += `
+            <div style="margin-bottom: 20px;">
+                <div style="font-weight: 600; margin-bottom: 8px;">改进建议</div>
+                ${result.suggestions.map(s => `<div style="padding: 8px 12px; margin-bottom: 6px; background: rgba(0,123,255,0.05); border-radius: 6px; font-size: 14px;">💡 ${s}</div>`).join('')}
+            </div>
+        `;
+    }
+
+    if (result.improvedVersion) {
+        html += `
+            <div style="margin-bottom: 20px;">
+                <div style="font-weight: 600; margin-bottom: 8px;">改进版本</div>
+                <div style="padding: 16px; background: var(--bg); border-radius: 8px; line-height: 1.8; font-size: 14px;">
+                    ${result.improvedVersion.replace(/\n/g, '<br>')}
+                </div>
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+WordCollectionApp.prototype.addPhotoUploadToTranslationBlank = function(sentenceIndex) {
+    const inputEl = document.getElementById(`translation-input-${sentenceIndex}`);
+    if (!inputEl) return;
+
+    const container = inputEl.parentElement;
+    if (!container) return;
+
+    // 避免重复添加
+    if (container.querySelector('.blank-photo-btn')) return;
+
+    const photoBtn = document.createElement('button');
+    photoBtn.className = 'blank-photo-btn';
+    photoBtn.innerHTML = '📷';
+    photoBtn.title = '拍照上传';
+    photoBtn.style.cssText = `
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+    `;
+
+    photoBtn.addEventListener('click', () => {
+        this.renderBlankPhotoDialog(sentenceIndex);
+    });
+
+    // 确保容器有相对定位
+    if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+    }
+    container.appendChild(photoBtn);
+}
+
+WordCollectionApp.prototype.processBlankPhoto = async function(sentenceIndex, imageData) {
+    this.showLoading('正在识别图片中的文字...');
+
+    try {
+        let extractedText = '';
+        let confidence = 0;
+
+        // 优先使用后端OCR服务
+        if (typeof agentClient !== 'undefined' && agentClient.analyzeFile) {
+            // 将base64转为blob
+            const blob = this.base64ToBlob(imageData);
+            const file = new File([blob], 'blank_photo.jpg', { type: 'image/jpeg' });
+            const result = await agentClient.analyzeFile(file);
+            if (result.success && result.data) {
+                extractedText = result.data.extractedText || '';
+                confidence = result.data.confidence || 0.85;
+            }
+        }
+
+        // 如果后端不可用或失败，尝试使用前端Tesseract.js（如果已加载）
+        if (!extractedText && typeof Tesseract !== 'undefined') {
+            const result = await Tesseract.recognize(imageData, 'eng');
+            extractedText = result.data.text || '';
+            confidence = result.data.confidence ? (result.data.confidence / 100) : 0.7;
+        }
+
+        if (!extractedText) {
+            alert('未能识别出文字，请尝试重新拍照或手动输入');
+            return;
+        }
+
+        // 清理识别结果（去除多余空格和换行）
+        extractedText = extractedText.replace(/\s+/g, ' ').trim();
+
+        // 填入对应输入框
+        const inputEl = document.getElementById(`translation-input-${sentenceIndex}`);
+        if (inputEl) {
+            inputEl.value = extractedText;
+            // 触发input事件以更新状态
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        // 保存到translationInputs
+        if (this.translationInputs) {
+            this.translationInputs[sentenceIndex] = extractedText;
+        }
+
+        // 显示识别结果和置信度
+        this.showBlankOCRResult(sentenceIndex, extractedText, confidence);
+    } catch (err) {
+        console.error('OCR识别失败:', err);
+        alert('识别失败，请检查网络或手动输入');
+    } finally {
+        this.hideLoading();
+    }
+}
+
+WordCollectionApp.prototype.base64ToBlob = function(base64) {
+    const parts = base64.split(',');
+    const mime = parts[0].match(/:(.*?);/)[1];
+    const binary = atob(parts[1]);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        array[i] = binary.charCodeAt(i);
+    }
+    return new Blob([array], { type: mime });
+}
+
+WordCollectionApp.prototype.showBlankOCRResult = function(sentenceIndex, text, confidence) {
+    const inputEl = document.getElementById(`translation-input-${sentenceIndex}`);
+    if (!inputEl) return;
+
+    // 移除旧的结果提示
+    const parent = inputEl.parentElement;
+    const oldTip = parent.querySelector('.blank-ocr-tip');
+    if (oldTip) oldTip.remove();
+
+    const confidencePercent = Math.round(confidence * 100);
+    const color = confidence >= 0.8 ? 'var(--success)' : confidence >= 0.5 ? 'var(--accent)' : 'var(--error)';
+
+    const tip = document.createElement('div');
+    tip.className = 'blank-ocr-tip';
+    tip.style.cssText = `
+        margin-top: 6px;
+        font-size: 12px;
+        color: ${color};
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    `;
+    tip.innerHTML = `
+        <span>📝 识别结果："${text.substring(0, 40)}${text.length > 40 ? '...' : ''}"</span>
+        <span>（置信度 ${confidencePercent}%）</span>
+    `;
+
+    parent.appendChild(tip);
+
+    // 3秒后自动淡出
+    setTimeout(() => {
+        if (tip.parentElement) {
+            tip.style.transition = 'opacity 0.5s';
+            tip.style.opacity = '0.5';
+        }
+    }, 3000);
+}
+
+WordCollectionApp.prototype.renderBlankPhotoDialog = function(sentenceIndex) {
+    // 移除旧对话框
+    const oldDialog = document.getElementById('blank-photo-dialog');
+    if (oldDialog) oldDialog.remove();
+
+    const dialog = document.createElement('div');
+    dialog.id = 'blank-photo-dialog';
+    dialog.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    `;
+
+    dialog.innerHTML = `
+        <div style="background: var(--card-bg); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; font-size: 18px;">📷 拍照识别第${sentenceIndex + 1}空</h3>
+                <button id="blank-photo-close" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <div id="blank-photo-preview" style="width: 100%; height: 200px; border: 2px dashed var(--border); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; background: var(--bg);">
+                    <div style="font-size: 48px; margin-bottom: 8px;">📷</div>
+                    <div>点击拍照或拖拽图片到此处</div>
+                    <div style="font-size: 12px; margin-top: 4px;">支持 JPG、PNG 格式</div>
+                </div>
+                <video id="blank-photo-video" style="width: 100%; border-radius: 12px; display: none;" autoplay playsinline></video>
+                <canvas id="blank-photo-canvas" style="display: none;"></canvas>
+                <img id="blank-photo-img" style="width: 100%; border-radius: 12px; display: none; margin-top: 12px;" />
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button id="blank-photo-camera-btn" style="flex: 1; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">📷 打开相机</button>
+                <button id="blank-photo-file-btn" style="flex: 1; padding: 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 14px;">📁 选择文件</button>
+            </div>
+
+            <div id="blank-photo-actions" style="display: none; margin-top: 16px; display: flex; gap: 10px;">
+                <button id="blank-photo-retake" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;">重拍</button>
+                <button id="blank-photo-confirm" style="flex: 1; padding: 10px; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer;">确认识别</button>
+            </div>
+
+            <input type="file" id="blank-photo-file-input" accept="image/*" style="display: none;" />
+        </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // 元素引用
+    const previewEl = document.getElementById('blank-photo-preview');
+    const videoEl = document.getElementById('blank-photo-video');
+    const canvasEl = document.getElementById('blank-photo-canvas');
+    const imgEl = document.getElementById('blank-photo-img');
+    const actionsEl = document.getElementById('blank-photo-actions');
+    const fileInput = document.getElementById('blank-photo-file-input');
+
+    let stream = null;
+    let capturedImage = null;
+
+    // 关闭对话框
+    document.getElementById('blank-photo-close').addEventListener('click', () => {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+        }
+        dialog.remove();
+    });
+
+    // 点击遮罩关闭
+    dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+            }
+            dialog.remove();
+        }
+    });
+
+    // 打开相机
+    document.getElementById('blank-photo-camera-btn').addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            videoEl.srcObject = stream;
+            videoEl.style.display = 'block';
+            previewEl.style.display = 'none';
+            imgEl.style.display = 'none';
+            actionsEl.style.display = 'flex';
+        } catch (err) {
+            alert('无法访问相机，请检查权限设置');
+            console.error('相机启动失败:', err);
+        }
+    });
+
+    // 选择文件
+    document.getElementById('blank-photo-file-btn').addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            capturedImage = ev.target.result;
+            imgEl.src = capturedImage;
+            imgEl.style.display = 'block';
+            videoEl.style.display = 'none';
+            previewEl.style.display = 'none';
+            actionsEl.style.display = 'flex';
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+                stream = null;
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // 拖拽上传
+    previewEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        previewEl.style.borderColor = 'var(--accent)';
+        previewEl.style.background = 'rgba(0,123,255,0.05)';
+    });
+    previewEl.addEventListener('dragleave', () => {
+        previewEl.style.borderColor = 'var(--border)';
+        previewEl.style.background = 'var(--bg)';
+    });
+    previewEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        previewEl.style.borderColor = 'var(--border)';
+        previewEl.style.background = 'var(--bg)';
+
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                capturedImage = ev.target.result;
+                imgEl.src = capturedImage;
+                imgEl.style.display = 'block';
+                videoEl.style.display = 'none';
+                previewEl.style.display = 'none';
+                actionsEl.style.display = 'flex';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 点击预览区也触发文件选择
+    previewEl.addEventListener('click', () => {
+        if (previewEl.style.display !== 'none') {
+            fileInput.click();
+        }
+    });
+
+    // 拍照
+    const takePhoto = () => {
+        canvasEl.width = videoEl.videoWidth;
+        canvasEl.height = videoEl.videoHeight;
+        canvasEl.getContext('2d').drawImage(videoEl, 0, 0);
+        capturedImage = canvasEl.toDataURL('image/jpeg', 0.9);
+        imgEl.src = capturedImage;
+        imgEl.style.display = 'block';
+        videoEl.style.display = 'none';
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+            stream = null;
+        }
+    };
+
+    videoEl.addEventListener('click', takePhoto);
+
+    // 重拍
+    document.getElementById('blank-photo-retake').addEventListener('click', () => {
+        capturedImage = null;
+        imgEl.style.display = 'none';
+        previewEl.style.display = 'flex';
+        actionsEl.style.display = 'none';
+    });
+
+    // 确认识别
+    document.getElementById('blank-photo-confirm').addEventListener('click', () => {
+        if (capturedImage) {
+            this.processBlankPhoto(sentenceIndex, capturedImage);
+            dialog.remove();
+        } else {
+            alert('请先拍照或选择图片');
+        }
+    });
+}
+
+WordCollectionApp.prototype.startMemoryQuickMode = function() {
+    if (!this.memoryWords || this.memoryWords.length === 0) {
+        // 加载单词
+        const letter = this.memoryLetter;
+        const mode = this.memoryMode;
+
+        let words = this.words;
+        if (mode === 'letter' && letter) {
+            words = words.filter(w => w.word.toUpperCase().startsWith(letter));
+        } else if (mode === 'favorites') {
+            words = words.filter(w => w.is_favorite);
+        }
+
+        // 随机打乱
+        this.memoryWords = words.sort(() => Math.random() - 0.5);
+        this.memoryCurrentIndex = 0;
+    }
+
+    if (this.memoryWords.length === 0) {
+        alert('当前条件下没有单词');
+        return;
+    }
+
+    this.memoryCurrentWord = this.memoryWords[this.memoryCurrentIndex];
+    this.renderMemoryQuickCard();
+}
+
+WordCollectionApp.prototype.renderMemoryQuickCard = function() {
+    const word = this.memoryCurrentWord;
+    if (!word) return;
+
+    const container = document.getElementById('memory-practice-area');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div id="memory-quick-card" style="text-align: center; padding: 40px 20px;">
+            <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">
+                ${this.memoryCurrentIndex + 1} / ${this.memoryWords.length}
+            </div>
+            <div id="memory-quick-word" style="font-size: 42px; font-weight: 700; margin-bottom: 32px; color: var(--text); cursor: pointer; user-select: none;">
+                ${word.word}
+            </div>
+            <div id="memory-quick-meaning" style="display: none; font-size: 20px; color: var(--accent); margin-bottom: 32px; padding: 16px; background: var(--bg); border-radius: 12px;">
+                ${word.meaning}
+            </div>
+            <div id="memory-quick-actions" style="display: flex; gap: 16px; justify-content: center;">
+                <button id="btn-memory-know" style="padding: 14px 36px; background: var(--success); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; font-weight: 600;">
+                    ✓ 认识
+                </button>
+                <button id="btn-memory-unknown" style="padding: 14px 36px; background: var(--error); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; font-weight: 600;">
+                    ✗ 不认识
+                </button>
+            </div>
+            <div id="memory-quick-next" style="display: none; margin-top: 24px;">
+                <button id="btn-memory-quick-next" style="padding: 12px 32px; background: var(--accent); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer;">
+                    下一个 →
+                </button>
+            </div>
+        </div>
+    `;
+
+    // 事件绑定
+    document.getElementById('btn-memory-know').addEventListener('click', () => {
+        this.handleMemoryQuickAnswer(true);
+    });
+
+    document.getElementById('btn-memory-unknown').addEventListener('click', () => {
+        this.handleMemoryQuickAnswer(false);
+    });
+
+    document.getElementById('btn-memory-quick-next').addEventListener('click', () => {
+        this.memoryCurrentIndex++;
+        if (this.memoryCurrentIndex >= this.memoryWords.length) {
+            this.renderMemoryQuickSummary();
+        } else {
+            this.memoryCurrentWord = this.memoryWords[this.memoryCurrentIndex];
+            this.renderMemoryQuickCard();
+        }
+    });
+
+    // 点击单词显示音标
+    document.getElementById('memory-quick-word').addEventListener('click', () => {
+        this.speakText(word.word);
+    });
+}
+
+WordCollectionApp.prototype.handleMemoryQuickAnswer = function(isKnown) {
+    const word = this.memoryCurrentWord;
+    if (!word) return;
+
+    const actionsEl = document.getElementById('memory-quick-actions');
+    const meaningEl = document.getElementById('memory-quick-meaning');
+    const nextEl = document.getElementById('memory-quick-next');
+
+    if (actionsEl) actionsEl.style.display = 'none';
+    if (meaningEl) meaningEl.style.display = 'block';
+    if (nextEl) nextEl.style.display = 'block';
+
+    if (isKnown) {
+        // 认识的单词
+        this.recordMemoryToCollection(word, true);
+        this.lightUpWord(word);
+
+        const wordEl = document.getElementById('memory-quick-word');
+        if (wordEl) {
+            wordEl.style.color = 'var(--success)';
+        }
+    } else {
+        // 不认识的单词
+        this.recordMemoryToCollection(word, false);
+
+        // 添加到错题本
+        this.addWrongRecord({
+            type: 'memory',
+            word: word.word,
+            meaning: word.meaning,
+            question: `单词记忆：${word.word}`,
+            correctAnswer: word.meaning,
+            userAnswer: '不认识'
+        });
+
+        const wordEl = document.getElementById('memory-quick-word');
+        if (wordEl) {
+            wordEl.style.color = 'var(--error)';
+        }
+    }
+}
+
+WordCollectionApp.prototype.renderMemoryQuickSummary = function() {
+    const container = document.getElementById('memory-practice-area');
+    if (!container) return;
+
+    const total = this.memoryWords.length;
+    const knownCount = this.memoryWords.filter(w => (w.correct_count || 0) > (w._quickModeBefore || 0)).length;
+
+    container.innerHTML = `
+        <div style="text-align: center; padding: 40px 20px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">🎉</div>
+            <div style="font-size: 24px; font-weight: 700; margin-bottom: 16px;">快速记忆完成</div>
+            <div style="font-size: 18px; color: var(--text-muted); margin-bottom: 32px;">
+                本次共复习 ${total} 个单词，认识 ${knownCount} 个
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button onclick="app.startMemoryQuickMode()" style="padding: 12px 28px; background: var(--accent); color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 15px;">
+                    再来一轮
+                </button>
+                <button onclick="app.switchPage('collection')" style="padding: 12px 28px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; font-size: 15px;">
+                    去收藏室查看
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+WordCollectionApp.prototype.lightUpWord = function(word) {
+    // 在收藏室中找到对应单词卡片
+    const cards = document.querySelectorAll(`.word-card[data-word="${word.word}"]`);
+    if (cards.length === 0) return;
+
+    const level = LevelSystem.getLevel(word.correct_count || 0);
+    const levelColors = ['#4caf50', '#2196f3', '#9c27b0', '#ff9800', '#f44336'];
+    const glowColor = levelColors[level] || levelColors[0];
+
+    cards.forEach(card => {
+        // 更新颜色等级
+        card.className = `word-card level-${level}`;
+
+        // 添加发光动画
+        card.style.animation = 'none';
+        card.offsetHeight; // 触发重排
+        card.style.animation = `wordLightUp 1.5s ease-out`;
+        card.style.boxShadow = `0 0 20px ${glowColor}80, 0 0 40px ${glowColor}40`;
+
+        // 更新计数显示
+        const countEl = card.querySelector('.word-count');
+        if (countEl) {
+            countEl.textContent = word.correct_count || 0;
+        }
+
+        // 1.5秒后恢复正常阴影
+        setTimeout(() => {
+            card.style.boxShadow = '';
+            card.style.animation = '';
+        }, 1500);
+    });
+
+    // 如果动态样式不存在，添加它
+    if (!document.getElementById('word-lightup-style')) {
+        const style = document.createElement('style');
+        style.id = 'word-lightup-style';
+        style.textContent = `
+            @keyframes wordLightUp {
+                0% { transform: scale(1); box-shadow: 0 0 0px transparent; }
+                30% { transform: scale(1.08); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+WordCollectionApp.prototype.recordMemoryToCollection = function(word, isCorrect) {
+    if (!word) return;
+
+    // 记录快速模式前的正确次数，用于统计
+    word._quickModeBefore = word.correct_count || 0;
+
+    if (isCorrect) {
+        word.correct_count = (word.correct_count || 0) + 1;
+    } else {
+        word.wrong_count = (word.wrong_count || 0) + 1;
+    }
+
+    // 保存到Storage
+    Storage.saveWords(this.words);
+
+    // 如果正确且达到新等级，触发lightUpWord
+    if (isCorrect) {
+        const oldLevel = LevelSystem.getLevel((word.correct_count || 0) - 1);
+        const newLevel = LevelSystem.getLevel(word.correct_count || 0);
+        if (newLevel > oldLevel) {
+            this.lightUpWord(word);
+
+            // 显示升级提示
+            this.showToast(`🎉 "${word.word}" 升级到 ${LevelSystem.getLevelName(newLevel)}！`);
+        }
+    }
+
+    // 记录活动
+    Storage.addActivity({
+        type: isCorrect ? 'correct' : 'wrong',
+        message: `单词记忆：${isCorrect ? '认识' : '不认识'} "${word.word}"`
+    });
+}
+
+WordCollectionApp.prototype.renderWrongListByType = function(filter = 'all') {
+    const list = document.getElementById('wrong-list');
+    if (!list) return;
+
+    // 扩展错误类型分类（在原有type基础上增加errorType）
+    const wrongRecords = this.wrongRecords || [];
+    const filtered = filter === 'all'
+        ? wrongRecords
+        : wrongRecords.filter(r => {
+            if (['practice', 'reading', 'translation', 'cloze', 'memory'].includes(filter)) {
+                return r.type === filter;
+            }
+            // 按AI分析的错误类型筛选
+            return r.aiAnalysis?.errorType === filter;
+        });
+
+    // 更新统计数据（扩充分类标签）
+    const typeCounts = {
+        all: wrongRecords.length,
+        practice: wrongRecords.filter(r => r.type === 'practice').length,
+        reading: wrongRecords.filter(r => r.type === 'reading').length,
+        translation: wrongRecords.filter(r => r.type === 'translation').length,
+        cloze: wrongRecords.filter(r => r.type === 'cloze').length,
+        memory: wrongRecords.filter(r => r.type === 'memory').length,
+        vocabulary: wrongRecords.filter(r => r.aiAnalysis?.errorType === '词汇').length,
+        grammar: wrongRecords.filter(r => r.aiAnalysis?.errorType === '语法').length,
+        understanding: wrongRecords.filter(r => r.aiAnalysis?.errorType === '理解').length,
+        spelling: wrongRecords.filter(r => r.aiAnalysis?.errorType === '拼写').length
+    };
+
+    // 更新UI计数
+    Object.entries(typeCounts).forEach(([key, count]) => {
+        const el = document.getElementById(`wrong-count-${key}`);
+        if (el) el.textContent = count;
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<div class="wrong-empty"><div class="empty-icon">🎉</div><p>该分类下暂无错题</p></div>';
+        return;
+    }
+
+    list.innerHTML = filtered.map(record => {
+        const typeLabels = {
+            practice: '例句练习',
+            reading: '阅读理解',
+            translation: '翻译练习',
+            cloze: '选词填空',
+            memory: '单词记忆'
+        };
+
+        const errorTypeColor = {
+            '词汇': '#ff6b6b',
+            '语法': '#feca57',
+            '理解': '#48dbfb',
+            '推理': '#ff9ff3',
+            '细节': '#54a0ff',
+            '主旨': '#5f27cd',
+            '拼写': '#ff9f43'
+        };
+
+        const aiTag = record.aiAnalysis?.errorType
+            ? `<span style="display: inline-block; padding: 2px 8px; background: ${errorTypeColor[record.aiAnalysis.errorType] || 'var(--text-muted)'}20; color: ${errorTypeColor[record.aiAnalysis.errorType] || 'var(--text-muted)'}; border-radius: 4px; font-size: 12px; margin-left: 8px;">${record.aiAnalysis.errorType}</span>`
+            : '';
+
+        const aiReason = record.aiAnalysis?.reason
+            ? `<div style="margin-top: 6px; font-size: 13px; color: var(--text-muted);">🤖 ${record.aiAnalysis.reason}</div>`
+            : '';
+
+        const aiSuggestion = record.aiAnalysis?.suggestion
+            ? `<div style="margin-top: 4px; font-size: 13px; color: var(--accent);">💡 ${record.aiAnalysis.suggestion}</div>`
+            : '';
+
+        return `
+            <div class="wrong-item" style="padding: 16px; background: var(--card-bg); border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div>
+                        <span style="display: inline-block; padding: 2px 8px; background: var(--accent); color: white; border-radius: 4px; font-size: 12px;">${typeLabels[record.type] || record.type}</span>
+                        ${aiTag}
+                    </div>
+                    <button onclick="app.removeWrongRecord(${record.id})" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px;">&times;</button>
+                </div>
+                <div style="font-weight: 600; margin-bottom: 6px;">${record.word || record.question || '未记录题目'}</div>
+                ${record.meaning ? `<div style="color: var(--text-muted); font-size: 14px; margin-bottom: 6px;">${record.meaning}</div>` : ''}
+                ${record.userAnswer ? `<div style="color: var(--error); font-size: 14px;">你的答案：${record.userAnswer}</div>` : ''}
+                ${record.correctAnswer ? `<div style="color: var(--success); font-size: 14px;">正确答案：${record.correctAnswer}</div>` : ''}
+                ${aiReason}
+                ${aiSuggestion}
+                <div style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+                    ${new Date(record.createdAt).toLocaleString('zh-CN')}
+                    ${record.passageTitle ? ` · ${record.passageTitle}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+WordCollectionApp.prototype.analyzeWrongPatterns = async function() {
+    const wrongRecords = this.wrongRecords || [];
+    if (wrongRecords.length === 0) {
+        alert('暂无错题记录，多做一些练习再来分析吧！');
+        return;
+    }
+
+    this.showLoading('AI正在分析错题规律...');
+
+    try {
+        // 本地分析错题数据
+        const analysis = this.localAnalyzeWrongPatterns(wrongRecords);
+
+        // 如果有API密钥，调用AI进行更深入分析
+        const apiKey = this.settings.apiKey;
+        if (apiKey && wrongRecords.length >= 3) {
+            try {
+                const aiAnalysis = await this.callAIWrongPatternAnalysis(wrongRecords, analysis);
+                analysis.aiSuggestions = aiAnalysis.suggestions || [];
+                analysis.weakTopics = aiAnalysis.weakTopics || analysis.weakTopics;
+            } catch (e) {
+                console.log('AI深度分析失败，使用本地分析结果');
+            }
+        }
+
+        this.renderWrongPatternAnalysis(analysis);
+    } catch (err) {
+        console.error('错题规律分析失败:', err);
+        alert('分析失败，请稍后重试');
+    } finally {
+        this.hideLoading();
+    }
+}
+
+WordCollectionApp.prototype.localAnalyzeWrongPatterns = function(wrongRecords) {
+    // 按题型统计
+    const typeStats = {};
+    wrongRecords.forEach(r => {
+        typeStats[r.type] = (typeStats[r.type] || 0) + 1;
+    });
+
+    // 按AI错误类型统计
+    const errorTypeStats = {};
+    wrongRecords.forEach(r => {
+        if (r.aiAnalysis?.errorType) {
+            errorTypeStats[r.aiAnalysis.errorType] = (errorTypeStats[r.aiAnalysis.errorType] || 0) + 1;
+        }
+    });
+
+    // 按时间趋势
+    const dailyStats = {};
+    wrongRecords.forEach(r => {
+        const date = new Date(r.createdAt).toISOString().split('T')[0];
+        dailyStats[date] = (dailyStats[date] || 0) + 1;
+    });
+
+    // 高频错误单词
+    const wordFreq = {};
+    wrongRecords.forEach(r => {
+        if (r.word) {
+            wordFreq[r.word] = (wordFreq[r.word] || 0) + 1;
+        }
+    });
+    const topWords = Object.entries(wordFreq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+    // 薄弱知识点TOP10
+    const weakTopics = Object.entries(errorTypeStats)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([topic, count]) => ({ topic, count }));
+
+    // 计算最近7天趋势
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        last7Days.push({ date: dateStr, count: dailyStats[dateStr] || 0 });
+    }
+
+    return {
+        totalWrong: wrongRecords.length,
+        typeStats,
+        errorTypeStats,
+        dailyStats,
+        topWords,
+        weakTopics,
+        last7Days,
+        suggestions: this.generateLocalSuggestions(typeStats, errorTypeStats, topWords)
+    };
+}
+
+WordCollectionApp.prototype.generateLocalSuggestions = function(typeStats, errorTypeStats, topWords) {
+    const suggestions = [];
+
+    const maxType = Object.entries(typeStats).sort((a, b) => b[1] - a[1])[0];
+    if (maxType) {
+        const typeNames = { practice: '例句练习', reading: '阅读理解', translation: '翻译练习', cloze: '选词填空', memory: '单词记忆' };
+        suggestions.push(`你在${typeNames[maxType[0]] || maxType[0]}中错题最多（${maxType[1]}道），建议重点加强该模块训练`);
+    }
+
+    const maxErrorType = Object.entries(errorTypeStats).sort((a, b) => b[1] - a[1])[0];
+    if (maxErrorType) {
+        suggestions.push(`${maxErrorType[0]}类错误最多（${maxErrorType[1]}道），建议针对性复习相关知识点`);
+    }
+
+    if (topWords.length > 0) {
+        suggestions.push(`"${topWords[0][0]}"等单词多次出错，建议加入重点记忆列表`);
+    }
+
+    suggestions.push('建议每天回顾错题本，重复出错的题目需要特别关注');
+    suggestions.push('可以尝试使用快速记忆模式，加强对薄弱单词的识记');
+
+    return suggestions;
+}
+
+WordCollectionApp.prototype.callAIWrongPatternAnalysis = async function(wrongRecords, localAnalysis) {
+    const apiKey = this.settings.apiKey;
+    if (!apiKey) throw new Error('未配置API密钥');
+
+    const prompt = `你是一位考研英语学习顾问。请根据以下学生的错题数据，分析其学习规律并给出针对性建议。
+
+错题统计：
+- 总错题数：${localAnalysis.totalWrong}
+- 各题型分布：${JSON.stringify(localAnalysis.typeStats)}
+- 错误类型分布：${JSON.stringify(localAnalysis.errorTypeStats)}
+- 高频错误单词：${localAnalysis.topWords.slice(0, 5).map(w => w[0]).join(', ')}
+
+请以JSON格式返回：
+{
+  "weakTopics": [
+    {"topic": "薄弱知识点1", "count": 估计出现次数, "advice": "针对性建议"}
+  ],
+  "suggestions": ["具体学习建议1", "具体学习建议2", "具体学习建议3"],
+  "studyPlan": "一周学习计划概要（中文，100字以内）"
+}`;
+
+    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: 'qwen-turbo',
+            input: {
+                messages: [
+                    { role: 'system', content: '你是考研英语学习顾问，擅长分析学生错题规律并制定针对性学习计划。' },
+                    { role: 'user', content: prompt }
+                ]
+            },
+            parameters: {
+                result_format: 'message'
+            }
+        })
+    });
+
+    if (!response.ok) throw new Error('API请求失败');
+
+    const data = await response.json();
+    const content = data.output?.choices?.[0]?.message?.content || '';
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+    }
+
+    throw new Error('无法解析AI分析结果');
+}
+
+WordCollectionApp.prototype.renderWrongPatternAnalysis = function(analysis) {
+    const container = document.getElementById('wrong-pattern-analysis');
+    if (!container) {
+        // 如果没有容器，在wrong-list前面插入
+        const list = document.getElementById('wrong-list');
+        if (!list) return;
+
+        const panel = document.createElement('div');
+        panel.id = 'wrong-pattern-analysis';
+        panel.style.cssText = 'margin-bottom: 24px;';
+        list.parentElement.insertBefore(panel, list);
+        return this.renderWrongPatternAnalysis(analysis);
+    }
+
+    let html = `
+        <div style="padding: 20px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px;">
+            <h3 style="margin: 0 0 16px 0; color: var(--accent);">📊 AI错题规律分析</h3>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                <div style="text-align: center; padding: 16px; background: var(--bg); border-radius: 8px;">
+                    <div style="font-size: 32px; font-weight: 700; color: var(--error);">${analysis.totalWrong}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">总错题数</div>
+                </div>
+    `;
+
+    // 题型分布
+    const typeNames = { practice: '例句', reading: '阅读', translation: '翻译', cloze: '完形', memory: '记忆' };
+    Object.entries(analysis.typeStats).forEach(([type, count]) => {
+        html += `
+            <div style="text-align: center; padding: 16px; background: var(--bg); border-radius: 8px;">
+                <div style="font-size: 28px; font-weight: 700; color: var(--accent);">${count}</div>
+                <div style="font-size: 12px; color: var(--text-muted);">${typeNames[type] || type}</div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+
+    // 薄弱知识点TOP10
+    if (analysis.weakTopics && analysis.weakTopics.length > 0) {
+        html += `
+            <div style="margin-bottom: 20px;">
+                <div style="font-weight: 600; margin-bottom: 12px;">🔍 薄弱知识点 TOP${Math.min(analysis.weakTopics.length, 10)}</div>
+        `;
+        analysis.weakTopics.forEach((item, idx) => {
+            const topic = typeof item === 'string' ? item : item.topic;
+            const count = typeof item === 'string' ? '' : `（${item.count}次）`;
+            const percent = analysis.totalWrong > 0
+                ? Math.round(((typeof item === 'string' ? 1 : item.count) / analysis.totalWrong) * 100)
+                : 0;
+
+            html += `
+                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                    <span style="width: 24px; color: var(--text-muted); font-size: 14px;">${idx + 1}</span>
+                    <span style="flex: 1; font-size: 14px;">${topic}${count}</span>
+                    <div style="width: 100px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin: 0 8px;">
+                        <div style="width: ${percent}%; height: 100%; background: var(--error); border-radius: 3px;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-muted); width: 36px; text-align: right;">${percent}%</span>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+
+    // 近7天趋势
+    if (analysis.last7Days && analysis.last7Days.length > 0) {
+        const maxCount = Math.max(...analysis.last7Days.map(d => d.count), 1);
+        html += `
+            <div style="margin-bottom: 20px;">
+                <div style="font-weight: 600; margin-bottom: 12px;">📈 近7天错题趋势</div>
+                <div style="display: flex; align-items: flex-end; gap: 8px; height: 80px; padding: 8px 0;">
+        `;
+        analysis.last7Days.forEach(d => {
+            const height = maxCount > 0 ? (d.count / maxCount) * 100 : 0;
+            const dateLabel = d.date.slice(5);
+            html += `
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <div style="width: 100%; height: ${Math.max(height, 4)}%; background: ${d.count > 0 ? 'var(--error)' : 'var(--border)'}; border-radius: 4px 4px 0 0; min-height: 4px; transition: height 0.3s;"></div>
+                    <div style="font-size: 10px; color: var(--text-muted);">${dateLabel}</div>
+                    <div style="font-size: 11px; font-weight: 600;">${d.count}</div>
+                </div>
+            `;
+        });
+        html += `</div></div>`;
+    }
+
+    // 学习建议
+    const suggestions = analysis.aiSuggestions || analysis.suggestions || [];
+    if (suggestions.length > 0) {
+        html += `
+            <div style="margin-bottom: 16px;">
+                <div style="font-weight: 600; margin-bottom: 12px;">💡 学习建议</div>
+                ${suggestions.map(s => `<div style="padding: 10px 12px; margin-bottom: 6px; background: rgba(0,123,255,0.05); border-radius: 8px; font-size: 14px; line-height: 1.5;">• ${s}</div>`).join('')}
+            </div>
+        `;
+    }
+
+    // 学习计划
+    if (analysis.studyPlan) {
+        html += `
+            <div style="padding: 12px; background: rgba(76,175,80,0.05); border-radius: 8px; border: 1px solid rgba(76,175,80,0.2);">
+                <div style="font-weight: 600; margin-bottom: 6px; color: var(--success);">📅 推荐学习计划</div>
+                <div style="font-size: 14px; line-height: 1.6;">${analysis.studyPlan}</div>
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
+WordCollectionApp.prototype.renderDetailedDiagnosis = function() {
+    const records = JSON.parse(localStorage.getItem('practice_records') || '[]');
+    const wrongRecords = JSON.parse(localStorage.getItem('wrong_records') || '[]');
+    const container = document.getElementById('detailed-diagnosis');
+    if (!container) return;
+
+    // 计算各题型得分趋势（最近30天）
+    const trendData = this.analyzeLearningTrend(30);
+
+    // 词汇掌握度
+    const mastery = this.calculateWordMastery();
+
+    // 薄弱知识点
+    const weakTopics = this.getWeakTopicsFromWrong(wrongRecords);
+
+    let html = `
+        <div style="padding: 20px;">
+            <h3 style="margin: 0 0 20px 0; color: var(--accent);">📊 详细学情诊断报告</h3>
+
+            <!-- 词汇掌握度 -->
+            <div style="margin-bottom: 24px; padding: 16px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border);">
+                <div style="font-weight: 600; margin-bottom: 12px;">📚 词汇掌握度分布</div>
+                <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-size: 14px;">总掌握率</span>
+                            <span style="font-weight: 600; color: var(--accent);">${mastery.overallRate}%</span>
+                        </div>
+                        <div style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${mastery.overallRate}%; height: 100%; background: linear-gradient(90deg, var(--success), var(--accent)); border-radius: 4px; transition: width 0.5s;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-left: 20px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: 700;">${mastery.mastered}</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">已掌握</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center;">
+    `;
+
+    const levelNames = ['绿色', '蓝色', '紫色', '金色', '红色'];
+    const levelRanges = ['0-2次', '3-5次', '6-10次', '11-20次', '21次+'];
+    const levelColors = ['#4caf50', '#2196f3', '#9c27b0', '#ff9800', '#f44336'];
+
+    mastery.levelCounts.forEach((count, idx) => {
+        const percent = mastery.total > 0 ? Math.round((count / mastery.total) * 100) : 0;
+        html += `
+            <div style="padding: 8px; background: var(--bg); border-radius: 6px;">
+                <div style="width: 16px; height: 16px; background: ${levelColors[idx]}; border-radius: 50%; margin: 0 auto 4px;"></div>
+                <div style="font-size: 12px; font-weight: 600;">${count}</div>
+                <div style="font-size: 10px; color: var(--text-muted);">${levelNames[idx]}</div>
+                <div style="font-size: 10px; color: var(--text-muted);">${percent}%</div>
+            </div>
+        `;
+    });
+
+    html += `</div></div>`;
+
+    // 学习趋势
+    if (trendData && trendData.dailyData.length > 0) {
+        html += `
+            <div style="margin-bottom: 24px; padding: 16px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border);">
+                <div style="font-weight: 600; margin-bottom: 12px;">📈 近30天学习趋势</div>
+                <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                    <div style="flex: 1; text-align: center; padding: 12px; background: var(--bg); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: 700; color: var(--accent);">${trendData.totalActiveDays}</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">活跃天数</div>
+                    </div>
+                    <div style="flex: 1; text-align: center; padding: 12px; background: var(--bg); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: 700; color: var(--success);">${trendData.avgAccuracy}%</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">平均正确率</div>
+                    </div>
+                    <div style="flex: 1; text-align: center; padding: 12px; background: var(--bg); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: 700; color: var(--error);">${trendData.totalWrong}</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">新增错题</div>
+                    </div>
+                </div>
+        `;
+
+        // 正确率趋势图（简化柱状图）
+        const dailyData = trendData.dailyData.slice(-14); // 只显示最近14天
+        const maxCount = Math.max(...dailyData.map(d => d.total), 1);
+        html += `
+            <div style="display: flex; align-items: flex-end; gap: 4px; height: 100px; padding: 8px 0; overflow-x: auto;">
+        `;
+        dailyData.forEach(d => {
+            const totalHeight = maxCount > 0 ? (d.total / maxCount) * 100 : 0;
+            const correctHeight = d.total > 0 ? (d.correct / d.total) * totalHeight : 0;
+            const dateLabel = d.date.slice(5);
+            html += `
+                <div style="flex: 1; min-width: 24px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <div style="width: 100%; height: ${Math.max(totalHeight, 2)}%; position: relative; background: var(--error); border-radius: 2px 2px 0 0; overflow: hidden;">
+                        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: ${correctHeight}%; background: var(--success);"></div>
+                    </div>
+                    <div style="font-size: 9px; color: var(--text-muted); white-space: nowrap;">${dateLabel}</div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+        html += `<div style="display: flex; gap: 16px; margin-top: 8px; font-size: 12px; justify-content: center;"><span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: var(--success); border-radius: 2px;"></span>正确</span><span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: var(--error); border-radius: 2px;"></span>错误</span></div>`;
+        html += `</div>`;
+    }
+
+    // 薄弱知识点TOP10
+    if (weakTopics.length > 0) {
+        html += `
+            <div style="margin-bottom: 24px; padding: 16px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border);">
+                <div style="font-weight: 600; margin-bottom: 12px;">🔍 薄弱知识点 TOP${Math.min(weakTopics.length, 10)}</div>
+        `;
+        weakTopics.forEach((topic, idx) => {
+            const barWidth = Math.min((topic.count / (weakTopics[0].count || 1)) * 100, 100);
+            html += `
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <span style="width: 20px; font-size: 12px; color: var(--text-muted);">${idx + 1}</span>
+                    <span style="width: 80px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topic.name}</span>
+                    <div style="flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin: 0 10px;">
+                        <div style="width: ${barWidth}%; height: 100%; background: ${idx < 3 ? 'var(--error)' : idx < 6 ? 'var(--accent)' : 'var(--success)'}; border-radius: 4px;"></div>
+                    </div>
+                    <span style="width: 30px; text-align: right; font-size: 12px; color: var(--text-muted);">${topic.count}</span>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+
+    // 综合学习建议
+    html += `
+        <div style="padding: 16px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border);">
+            <div style="font-weight: 600; margin-bottom: 12px;">💡 综合学习建议</div>
+            ${this.generateDetailedSuggestions(mastery, trendData, weakTopics).map(s =>
+                `<div style="padding: 10px 12px; margin-bottom: 6px; background: rgba(0,123,255,0.05); border-radius: 8px; font-size: 14px; line-height: 1.5;">• ${s}</div>`
+            ).join('')}
+        </div>
+    `;
+
+    html += `</div>`;
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
+WordCollectionApp.prototype.generateDetailedSuggestions = function(mastery, trendData, weakTopics) {
+    const suggestions = [];
+
+    if (mastery.overallRate < 30) {
+        suggestions.push('词汇掌握度较低，建议从高频核心词汇开始，每天使用快速记忆模式复习50个单词');
+    } else if (mastery.overallRate < 60) {
+        suggestions.push('词汇掌握度中等，建议加强记忆练习，重点关注蓝色及以下等级的单词');
+    } else {
+        suggestions.push('词汇基础较好，可以挑战更高难度的阅读和翻译材料');
+    }
+
+    if (trendData) {
+        if (trendData.avgAccuracy < 50) {
+            suggestions.push('近期正确率偏低，建议降低练习难度，先巩固基础再逐步提升');
+        } else if (trendData.avgAccuracy < 75) {
+            suggestions.push(`近期正确率为${trendData.avgAccuracy}%，有提升空间，建议多回顾错题本`);
+        }
+
+        if (trendData.totalActiveDays < 7) {
+            suggestions.push('最近学习频率较低，建议制定每日学习计划，保持学习连贯性');
+        }
+    }
+
+    if (weakTopics.length > 0) {
+        suggestions.push(`"${weakTopics[0].name}"是最薄弱的知识点，建议针对性加强练习`);
+    }
+
+    suggestions.push('定期使用AI分析错题规律，及时调整学习策略');
+    suggestions.push('阅读理解和作文是考研英语的重点，建议每周至少完成2篇阅读练习和1篇作文练习');
+
+    return suggestions;
+}
+
+WordCollectionApp.prototype.calculateWordMastery = function() {
+    const total = this.words.length;
+    const levelCounts = [0, 0, 0, 0, 0];
+
+    this.words.forEach(w => {
+        const level = LevelSystem.getLevel(w.correct_count || 0);
+        levelCounts[level]++;
+    });
+
+    // 已掌握：蓝色及以上（correct_count >= 3）
+    const mastered = levelCounts[1] + levelCounts[2] + levelCounts[3] + levelCounts[4];
+    const overallRate = total > 0 ? Math.round((mastered / total) * 100) : 0;
+
+    return {
+        total,
+        mastered,
+        overallRate,
+        levelCounts,
+        levelNames: ['绿色 (初学)', '蓝色 (熟悉)', '紫色 (掌握)', '金色 (精通)', '红色 (巩固)']
+    };
+}
+
+WordCollectionApp.prototype.analyzeLearningTrend = function(days = 30) {
+    const records = JSON.parse(localStorage.getItem('practice_records') || '[]');
+    const wrongRecords = JSON.parse(localStorage.getItem('wrong_records') || '[]');
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const cutoffStr = cutoffDate.toISOString();
+
+    // 筛选最近N天的记录
+    const recentRecords = records.filter(r => r.time && r.time >= cutoffStr);
+    const recentWrong = wrongRecords.filter(r => r.createdAt && r.createdAt >= cutoffStr);
+
+    // 按天聚合
+    const dailyMap = {};
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        dailyMap[dateStr] = { date: dateStr, total: 0, correct: 0, wrong: 0 };
+    }
+
+    recentRecords.forEach(r => {
+        const dateStr = r.time.split('T')[0];
+        if (dailyMap[dateStr]) {
+            dailyMap[dateStr].total++;
+            if (r.correct) dailyMap[dateStr].correct++;
+            else dailyMap[dateStr].wrong++;
+        }
+    });
+
+    recentWrong.forEach(r => {
+        const dateStr = r.createdAt.split('T')[0];
+        if (dailyMap[dateStr]) {
+            dailyMap[dateStr].wrong++;
+        }
+    });
+
+    const dailyData = Object.values(dailyMap);
+    const activeDays = dailyData.filter(d => d.total > 0);
+    const totalActiveDays = activeDays.length;
+
+    const totalCorrect = recentRecords.filter(r => r.correct).length;
+    const totalAttempts = recentRecords.length;
+    const avgAccuracy = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0;
+
+    return {
+        dailyData,
+        totalActiveDays,
+        avgAccuracy,
+        totalAttempts,
+        totalCorrect,
+        totalWrong: recentWrong.length,
+        practiceCount: recentRecords.length
+    };
+}
+
+WordCollectionApp.prototype.getWeakTopicsFromWrong = function(wrongRecords) {
+    const topicMap = {};
+
+    wrongRecords.forEach(r => {
+        // 从AI分析中提取
+        if (r.aiAnalysis?.knowledgePoint) {
+            const topic = r.aiAnalysis.knowledgePoint;
+            topicMap[topic] = (topicMap[topic] || 0) + 1;
+        }
+        // 从错误类型中提取
+        if (r.aiAnalysis?.errorType) {
+            const topic = r.aiAnalysis.errorType;
+            topicMap[topic] = (topicMap[topic] || 0) + 1;
+        }
+        // 从题型中提取
+        if (r.type) {
+            const typeNames = { practice: '例句练习', reading: '阅读理解', translation: '翻译练习', cloze: '选词填空', memory: '单词记忆' };
+            const topic = typeNames[r.type] || r.type;
+            topicMap[topic] = (topicMap[topic] || 0) + 1;
+        }
+        // 从单词中提取
+        if (r.word) {
+            topicMap[r.word] = (topicMap[r.word] || 0) + 1;
+        }
+    });
+
+    return Object.entries(topicMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, count]) => ({ name, count }));
+}
+
+WordCollectionApp.prototype.addToCollection = function(word) {
+    // 复用现有的收藏逻辑，如果已存在则更新
+    const existing = this.words.find(w => w.word === word.word);
+    if (existing) {
+        existing.correct_count = word.correct_count;
+        existing.wrong_count = word.wrong_count;
+        Storage.saveWords(this.words);
+    }
+}
+
+WordCollectionApp.prototype.checkMeaningMatch = function(userMeaning, correctMeaning) {
+    if (!userMeaning || !correctMeaning) return false;
+    const user = userMeaning.toLowerCase().replace(/[，,；;。\.]/g, ' ').trim();
+    const correct = correctMeaning.toLowerCase().replace(/[，,；;。\.]/g, ' ').trim();
+    return user === correct || correct.includes(user) || user.includes(correct);
+}
+
+WordCollectionApp.prototype.speakText = function(text) {
+    if (!text) return;
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    }
+}
+
+WordCollectionApp.prototype.getWritingInputText = function() {
+    const activePanel = document.querySelector('.writing-input-panel.active');
+    if (!activePanel) return '';
+    const id = activePanel.id;
+    if (id === 'panel-text') {
+        return document.getElementById('writing-textarea')?.value.trim() || '';
+    } else if (id === 'panel-camera') {
+        return document.getElementById('ocr-text')?.value.trim() || '';
+    } else if (id === 'panel-file') {
+        return document.getElementById('file-text')?.value.trim() || '';
+    }
+    return '';
+}
+
+// ===== 设置按钮外观控制 =====
+WordCollectionApp.prototype.toggleSettingsBtnVisibility = function() {
+    const checkbox = document.getElementById('btn-hide-settings');
+    const btn = document.getElementById('settings-btn');
+    if (!checkbox || !btn) return;
+    if (checkbox.checked) {
+        btn.style.display = 'none';
+        localStorage.setItem('ciguang_settings_btn_hidden', 'true');
+    } else {
+        btn.style.display = 'flex';
+        localStorage.removeItem('ciguang_settings_btn_hidden');
+    }
+}
+
+WordCollectionApp.prototype.setSettingsBtnOpacity = function(value) {
+    const btn = document.getElementById('settings-btn');
+    const label = document.getElementById('btn-opacity-value');
+    if (btn) btn.style.opacity = value;
+    if (label) label.textContent = Math.round(value * 100) + '%';
+    localStorage.setItem('ciguang_settings_btn_opacity', value);
+}
+
+WordCollectionApp.prototype.initSettingsBtnAppearance = function() {
+    const hidden = localStorage.getItem('ciguang_settings_btn_hidden') === 'true';
+    const opacity = localStorage.getItem('ciguang_settings_btn_opacity');
+    const checkbox = document.getElementById('btn-hide-settings');
+    const slider = document.getElementById('btn-opacity-settings');
+    if (hidden && checkbox) {
+        checkbox.checked = true;
+        this.toggleSettingsBtnVisibility();
+    }
+    if (opacity && slider) {
+        slider.value = opacity;
+        this.setSettingsBtnOpacity(opacity);
+    }
+}
+
+// ===== 翻译句子拍照上传 =====
+WordCollectionApp.prototype.openSentencePhotoDialog = function(idx) {
+    const video = document.getElementById('camera-video');
+    const canvas = document.getElementById('camera-canvas');
+    const status = document.getElementById('sentence-photo-status-' + idx);
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (status) status.textContent = '浏览器不支持摄像头';
+        return;
+    }
+
+    if (status) status.textContent = '正在打开摄像头...';
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+            // Create a temporary video element for snapshot
+            const tempVideo = document.createElement('video');
+            tempVideo.srcObject = stream;
+            tempVideo.play();
+
+            // Take photo after a short delay
+            setTimeout(() => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = tempVideo.videoWidth || 640;
+                tempCanvas.height = tempVideo.videoHeight || 480;
+                const ctx = tempCanvas.getContext('2d');
+                ctx.drawImage(tempVideo, 0, 0);
+
+                // Stop stream
+                stream.getTracks().forEach(t => t.stop());
+
+                // Process image
+                const imageData = tempCanvas.toDataURL('image/jpeg');
+                this.processSentencePhoto(idx, imageData);
+            }, 800);
+        })
+        .catch(err => {
+            console.error('Camera error:', err);
+            if (status) status.textContent = '摄像头打开失败';
+        });
+}
+
+WordCollectionApp.prototype.handleSentenceFile = function(idx, input) {
+    const file = input.files[0];
+    const status = document.getElementById('sentence-photo-status-' + idx);
+    if (!file) return;
+    if (status) status.textContent = '正在识别...';
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        this.processSentencePhoto(idx, e.target.result);
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+}
+
+WordCollectionApp.prototype.processSentencePhoto = function(idx, imageData) {
+    const status = document.getElementById('sentence-photo-status-' + idx);
+    const textarea = document.getElementById('translation-input-' + idx);
+
+    if (status) status.textContent = '识别中...';
+
+    // Use Tesseract.js for OCR
+    if (typeof Tesseract !== 'undefined') {
+        Tesseract.recognize(imageData, 'eng', { logger: () => {} })
+            .then(result => {
+                const text = result.data.text.trim();
+                if (textarea) {
+                    textarea.value = text;
+                    this.translationInputs[idx] = text;
+                }
+                if (status) status.textContent = '✓ 识别完成';
+                setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+            })
+            .catch(err => {
+                console.error('OCR error:', err);
+                if (status) status.textContent = '识别失败，请手动输入';
+            });
+    } else {
+        if (status) status.textContent = 'OCR 库未加载';
+    }
+}
+
+// ===== 拍照提取翻译题目 =====
+WordCollectionApp.prototype.extractTranslationTopicByPhoto = function() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('浏览器不支持摄像头功能');
+        return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+            const tempVideo = document.createElement('video');
+            tempVideo.srcObject = stream;
+            tempVideo.play();
+
+            setTimeout(() => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = tempVideo.videoWidth || 640;
+                tempCanvas.height = tempVideo.videoHeight || 480;
+                const ctx = tempCanvas.getContext('2d');
+                ctx.drawImage(tempVideo, 0, 0);
+                stream.getTracks().forEach(t => t.stop());
+
+                const imageData = tempCanvas.toDataURL('image/jpeg');
+                this.processExtractTranslationTopic(imageData);
+            }, 800);
+        })
+        .catch(err => {
+            console.error('Camera error:', err);
+            alert('摄像头打开失败：' + err.message);
+        });
+}
+
+WordCollectionApp.prototype.processExtractTranslationTopic = function(imageData) {
+    const passageEl = document.getElementById('translation-passage');
+    if (passageEl) {
+        passageEl.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><span>正在识别题目内容...</span></div>';
+    }
+
+    if (typeof Tesseract !== 'undefined') {
+        Tesseract.recognize(imageData, 'chi_sim+eng', { logger: () => {} })
+            .then(result => {
+                const text = result.data.text.trim();
+                if (text) {
+                    this.generateTranslationFromExtractedText(text);
+                } else {
+                    if (passageEl) passageEl.innerHTML = '<p style="color: var(--text-muted);">未能识别到文字，请重新拍照</p>';
+                }
+            })
+            .catch(err => {
+                console.error('OCR error:', err);
+                if (passageEl) passageEl.innerHTML = '<p style="color: var(--text-muted);">识别失败，请重试</p>';
+            });
+    } else {
+        if (passageEl) passageEl.innerHTML = '<p style="color: var(--text-muted);">OCR 库未加载</p>';
+    }
+}
+
+WordCollectionApp.prototype.generateTranslationFromExtractedText = function(text) {
+    // 简单解析：按句子分割，生成翻译练习材料
+    const sentences = text.split(/[。！？\n]/).filter(s => s.trim().length > 5);
+    const material = {
+        title: '拍照提取题目',
+        sentences: sentences.slice(0, 5).map((s, i) => ({
+            cn: s.trim(),
+            keywords: this.extractKeywords(s)
+        }))
+    };
+
+    // 渲染提取的内容
+    const passageEl = document.getElementById('translation-passage');
+    if (passageEl) {
+        passageEl.innerHTML = `
+            <div class="translation-title">📷 拍照提取题目</div>
+            <div class="translation-intro">请翻译以下识别出的句子：</div>
+        `;
+    }
+
+    this.currentTranslationMaterial = material;
+    this.translationInputs = {};
+    this.renderTranslationSentences(material);
+    this.startTimer('translation');
+}
+
+WordCollectionApp.prototype.extractKeywords = function(sentence) {
+    // 简单提取句子中较长的中文词作为关键词提示
+    const words = sentence.match(/[\u4e00-\u9fa5]{2,4}/g) || [];
+    return words.slice(0, 3);
+}
+
+// ===== 学习助手Agent =====
+WordCollectionApp.prototype.formatStudyTime = function(ms) {
+    const totalMinutes = Math.floor(ms / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0) return `${hours}小时${minutes}分钟`;
+    return `${minutes}分钟`;
+}
+
+WordCollectionApp.prototype.calculateGrowthLevel = function() {
+    const stats = this.getAgentStats();
+    const xp = stats.totalXP;
+
+    const levels = [
+        { name: '初学者', icon: '🌱', minXp: 0, maxXp: 99, color: '#48bb78' },
+        { name: '成长者', icon: '🌿', minXp: 100, maxXp: 299, color: '#4a9eff' },
+        { name: '进阶者', icon: '🌳', minXp: 300, maxXp: 599, color: '#9f7aea' },
+        { name: '熟练者', icon: '⭐', minXp: 600, maxXp: 999, color: '#ecc94b' },
+        { name: '词光大师', icon: '🏆', minXp: 1000, maxXp: 99999, color: '#f56565' }
+    ];
+
+    let currentLevel = levels[0];
+    let nextLevel = levels[1];
+    for (let i = 0; i < levels.length; i++) {
+        if (xp >= levels[i].minXp && xp <= levels[i].maxXp) {
+            currentLevel = levels[i];
+            nextLevel = levels[i + 1] || null;
+            break;
+        }
+    }
+
+    const progress = nextLevel
+        ? Math.round(((xp - currentLevel.minXp) / (nextLevel.minXp - currentLevel.minXp)) * 100)
+        : 100;
+    const xpToNext = nextLevel ? nextLevel.minXp - xp : 0;
+
+    return { level: currentLevel, nextLevel, xp, progress, xpToNext, allLevels: levels };
+}
+
+WordCollectionApp.prototype.getAgentStats = function() {
+    const moduleStats = Storage.getModuleStats();
+    const wrongRecords = this.wrongRecords || [];
+
+    // 总答对数
+    const totalCorrect = this.words.reduce((sum, w) => sum + (w.correct_count || 0), 0);
+    const totalWrong = this.words.reduce((sum, w) => sum + (w.wrong_count || 0), 0);
+    const totalAnswers = totalCorrect + totalWrong;
+    const accuracy = totalAnswers > 0 ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
+
+    // 错题修正次数：错题本中的词现在已掌握（correct_count >= 3）
+    const wrongWords = new Set(wrongRecords.map(r => r.word).filter(Boolean));
+    let errorCorrections = 0;
+    this.words.forEach(w => {
+        if (wrongWords.has(w.word) && (w.correct_count || 0) >= 3) {
+            errorCorrections++;
+        }
+    });
+
+    // 练习总数
+    const totalExercises = (moduleStats.reading?.passages || 0)
+        + (moduleStats.cloze?.passages || 0)
+        + (moduleStats.translation?.total || 0);
+
+    // 阅读正确率
+    const readingAccuracy = moduleStats.reading && moduleStats.reading.total > 0
+        ? Math.round((moduleStats.reading.correct / moduleStats.reading.total) * 100) : 0;
+
+    // 选词正确率
+    const clozeAccuracy = moduleStats.cloze && moduleStats.cloze.total > 0
+        ? Math.round((moduleStats.cloze.correct / moduleStats.cloze.total) * 100) : 0;
+
+    // 翻译/作文平均分
+    const translationScore = moduleStats.translation?.avgScore || 0;
+
+    // 已掌握单词数
+    const masteredWords = this.words.filter(w => (w.correct_count || 0) >= 3).length;
+
+    // XP计算
+    const totalXP = totalCorrect * 10
+        + totalExercises * 5
+        + errorCorrections * 15
+        + masteredWords * 8
+        + (accuracy >= 80 ? 30 : 0);
+
+    return {
+        totalCorrect, totalWrong, totalAnswers, accuracy,
+        errorCorrections, totalExercises, masteredWords,
+        readingAccuracy, clozeAccuracy, translationScore,
+        totalStudyTime: this.totalStudyTime || 0,
+        wrongCount: wrongRecords.length,
+        totalXP
+    };
+}
+
+WordCollectionApp.prototype.analyzeErrorPatterns = function(wrongItems, exerciseType) {
+    if (!wrongItems || wrongItems.length === 0) return null;
+
+    const patterns = {
+        reading: {
+            vocabulary: 0, detail: 0, mainIdea: 0, inference: 0, grammar: 0
+        },
+        cloze: {
+            vocabulary: 0, grammar: 0, context: 0
+        },
+        translation: {
+            keyword: 0, grammar: 0, expression: 0
+        },
+        writing: {
+            vocabulary: 0, grammar: 0, structure: 0, content: 0
+        }
+    };
+
+    const typeMap = patterns[exerciseType] || patterns.reading;
+    const analysis = { ...typeMap };
+    const errors = [];
+
+    wrongItems.forEach(item => {
+        if (exerciseType === 'reading') {
+            const q = (item.question || '').toLowerCase();
+            if (q.includes('main idea') || q.includes('主旨') || q.includes('title') || q.includes('purpose')) {
+                analysis.mainIdea++;
+                errors.push({ type: 'mainIdea', word: item.word || '' });
+            } else if (q.includes('infer') || q.includes('imply') || q.includes('suggest') || q.includes('推断') || q.includes('implies')) {
+                analysis.inference++;
+                errors.push({ type: 'inference', word: item.word || '' });
+            } else if (q.includes('word') || q.includes('meaning') || q.includes('词') || q.includes('replace')) {
+                analysis.vocabulary++;
+                errors.push({ type: 'vocabulary', word: item.word || '' });
+            } else if (q.includes('grammar') || q.includes('语法')) {
+                analysis.grammar++;
+                errors.push({ type: 'grammar', word: item.word || '' });
+            } else {
+                analysis.detail++;
+                errors.push({ type: 'detail', word: item.word || '' });
+            }
+        } else if (exerciseType === 'cloze') {
+            analysis.vocabulary++;
+            errors.push({ type: 'vocabulary', word: item.word || item.correctAnswer || '' });
+        } else if (exerciseType === 'translation') {
+            if (item.score < 40) {
+                analysis.keyword++;
+            } else if (item.score < 70) {
+                analysis.grammar++;
+            } else {
+                analysis.expression++;
+            }
+            errors.push({ type: 'translation', word: '' });
+        }
+    });
+
+    // 找出最薄弱项
+    let maxType = '';
+    let maxValue = 0;
+    Object.entries(analysis).forEach(([type, count]) => {
+        if (count > maxValue) {
+            maxValue = count;
+            maxType = type;
+        }
+    });
+
+    const typeNameMap = {
+        vocabulary: '词汇理解', detail: '细节定位', mainIdea: '主旨把握',
+        inference: '推理判断', grammar: '语法结构', context: '上下文理解',
+        keyword: '关键词遗漏', expression: '表达自然度'
+    };
+
+    return {
+        analysis, errors,
+        weakestType: maxType,
+        weakestName: typeNameMap[maxType] || maxType,
+        totalErrors: wrongItems.length
+    };
+}
+
+WordCollectionApp.prototype.generateAgentMessage = function(exerciseType, score, correct, total, wrongItems, stats, errorAnalysis) {
+    const typeNames = {
+        reading: '阅读理解', cloze: '选词填空', translation: '翻译练习', writing: '作文练习'
+    };
+    const typeName = typeNames[exerciseType] || '练习';
+    const allCorrect = correct === total;
+    const accuracy = stats.accuracy;
+
+    let message = '';
+    let tips = [];
+
+    if (allCorrect) {
+        // 全对恭喜
+        const congratsMessages = [
+            `🎉 太棒了！${typeName}全对！你的努力正在开花结果！`,
+            `🌟 完美通关！每一题都答对了，你已经掌握了这些知识点！`,
+            `👏 恭喜你！${correct}题全部正确，保持这个状态，继续加油！`,
+            `✨ 全对！你的英语水平正在稳步提升，为你骄傲！`
+        ];
+        message = congratsMessages[Math.floor(Math.random() * congratsMessages.length)];
+
+        if (stats.totalXP >= 300) {
+            tips.push(`你已累计获得 ${stats.totalXP} 经验值，距离下一等级只差${this.calculateGrowthLevel().xpToNext}点！`);
+        }
+        if (accuracy >= 80) {
+            tips.push(`整体正确率 ${accuracy}%，你已经是学霸级别了！`);
+        }
+        if (stats.masteredWords > 0) {
+            tips.push(`已掌握 ${stats.masteredWords} 个单词，词汇量稳步增长中！`);
+        }
+    } else {
+        // 有错鼓励
+        const correctRate = Math.round((correct / total) * 100);
+        const encouragements = [
+            `💪 别灰心！这次答对了 ${correct}/${total} 题，每一次练习都是进步！`,
+            `🌱 成长需要过程，${correct}/${total} 的正确率说明你已经有了一定基础，继续加油！`,
+            `📚 错误是最好的老师，这次做错的题我们一起来分析！`,
+            `🔥 坚持就是胜利！你已经完成了 ${stats.totalExercises} 次练习，经验值在不断增加！`
+        ];
+        message = encouragements[Math.floor(Math.random() * encouragements.length)];
+
+        // 基于错误分析给出建议
+        if (errorAnalysis) {
+            const adviceMap = {
+                vocabulary: '词汇是英语学习的基石，建议每天复习高频词汇，结合例句记忆效果更好',
+                detail: '细节题需要精准定位原文，练习时注意圈画关键词，回到原文逐句比对',
+                mainIdea: '主旨题要关注文章首尾段和各段首句，把握作者整体意图',
+                inference: '推理题要基于原文信息合理推断，避免过度解读或主观臆断',
+                grammar: '语法结构是语言框架，建议系统复习从句、非谓语动词等核心语法点',
+                context: '上下文理解需要关注逻辑连接词，理清段落间的因果关系',
+                keyword: '翻译时注意保留原文关键词，避免遗漏核心信息',
+                expression: '表达可以更自然流畅，多读多背优质英文素材培养语感'
+            };
+            const advice = adviceMap[errorAnalysis.weakestType];
+            if (advice) {
+                tips.push(`📌 主要薄弱点：${errorAnalysis.weakestName}。${advice}`);
+            }
+        }
+
+        // 基于历史数据鼓励
+        if (stats.errorCorrections > 0) {
+            tips.push(`✅ 你已经成功修正了 ${stats.errorCorrections} 个曾经的错题，证明了你的进步能力！`);
+        }
+        if (accuracy >= 60 && correctRate < accuracy) {
+            tips.push(`📈 你的整体正确率是 ${accuracy}%，这次发挥稍有波动，调整心态下次一定更好！`);
+        }
+        if (stats.totalStudyTime > 0) {
+            tips.push(`⏱️ 累计学习 ${this.formatStudyTime(stats.totalStudyTime)}，坚持就是胜利！`);
+        }
+    }
+
+    return { message, tips };
+}
+
+WordCollectionApp.prototype.showAgentFeedback = function(exerciseType, score, correct, total, wrongItems) {
+    const stats = this.getAgentStats();
+    const errorAnalysis = wrongItems && wrongItems.length > 0
+        ? this.analyzeErrorPatterns(wrongItems, exerciseType) : null;
+    const { message, tips } = this.generateAgentMessage(exerciseType, score, correct, total, wrongItems, stats, errorAnalysis);
+    const growth = this.calculateGrowthLevel();
+
+    this.renderAgentPanel({
+        exerciseType, score, correct, total,
+        message, tips, stats, growth, errorAnalysis
+    });
+}
+
+WordCollectionApp.prototype.renderAgentPanel = function(data) {
+    let panel = document.getElementById('agent-panel');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'agent-panel';
+        panel.className = 'agent-panel';
+        document.body.appendChild(panel);
+    }
+
+    const { message, tips, stats, growth, score, correct, total, exerciseType } = data;
+    const typeNames = {
+        reading: '📖 阅读理解', cloze: '📝 选词填空',
+        translation: '🌐 翻译练习', writing: '✍️ 作文练习'
+    };
+    const isAllCorrect = correct === total;
+
+    let tipsHtml = '';
+    if (tips && tips.length > 0) {
+        tipsHtml = tips.map(t => `<div class="agent-tip">${t}</div>`).join('');
+    }
+
+    // 成长等级进度条
+    const progressColor = growth.level.color;
+    const progressBar = growth.nextLevel
+        ? `<div class="agent-progress-bar">
+            <div class="agent-progress-fill" style="width:${growth.progress}%;background:${progressColor}"></div>
+          </div>
+          <div class="agent-progress-text">
+            <span>${growth.level.icon} ${growth.level.name}</span>
+            <span>距 ${growth.nextLevel.icon} ${growth.nextLevel.name} 还差 ${growth.xpToNext} XP</span>
+          </div>`
+        : `<div class="agent-progress-bar">
+            <div class="agent-progress-fill" style="width:100%;background:${progressColor}"></div>
+          </div>
+          <div class="agent-progress-text">
+            <span>${growth.level.icon} ${growth.level.name}（满级）</span>
+            <span>${growth.xp} XP</span>
+          </div>`;
+
+    // 迷你统计卡片
+    const miniStats = `
+        <div class="agent-mini-stats">
+            <div class="mini-stat">
+                <div class="mini-stat-value">${stats.accuracy}%</div>
+                <div class="mini-stat-label">正确率</div>
+            </div>
+            <div class="mini-stat">
+                <div class="mini-stat-value">${stats.masteredWords}</div>
+                <div class="mini-stat-label">已掌握</div>
+            </div>
+            <div class="mini-stat">
+                <div class="mini-stat-value">${stats.errorCorrections}</div>
+                <div class="mini-stat-label">错题修正</div>
+            </div>
+            <div class="mini-stat">
+                <div class="mini-stat-value">${this.formatStudyTime(stats.totalStudyTime)}</div>
+                <div class="mini-stat-label">学习时长</div>
+            </div>
+        </div>`;
+
+    panel.innerHTML = `
+        <div class="agent-header">
+            <div class="agent-avatar">${isAllCorrect ? '🎉' : '🤖'}</div>
+            <div class="agent-title">
+                <div class="agent-name">词光学伴</div>
+                <div class="agent-subtitle">${typeNames[exerciseType] || '练习'} · ${correct}/${total} 正确</div>
+            </div>
+            <button class="agent-close" onclick="document.getElementById('agent-panel').classList.remove('show')">&times;</button>
+        </div>
+        <div class="agent-body">
+            <div class="agent-message ${isAllCorrect ? 'all-correct' : ''}">${message}</div>
+            ${tipsHtml ? `<div class="agent-tips">${tipsHtml}</div>` : ''}
+            <div class="agent-growth">
+                <div class="agent-growth-header">
+                    <span>📊 成长等级</span>
+                    <span class="agent-xp">${growth.xp} XP</span>
+                </div>
+                ${progressBar}
+            </div>
+            ${miniStats}
+        </div>
+    `;
+
+    // 显示面板（延迟一点让结果先渲染）
+    setTimeout(() => {
+        panel.classList.add('show');
+    }, 600);
+}
+
 // ===== 初始化应用 =====
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new WordCollectionApp();
     // 初始化认证UI
     updateAuthUI();
+    // 初始化设置按钮外观
+    setTimeout(() => window.app.initSettingsBtnAppearance(), 500);
 });

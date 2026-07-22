@@ -150,6 +150,19 @@
                         </div>
                     </div>
                 </div>
+                <!-- 新增：难度选择器 -->
+                <div class="difficulty-selector">
+                    <span class="mode-label">难度</span>
+                    <div class="mode-options">
+                        <button class="mode-btn active" onclick="app.setPracticeDifficulty('easy')">简单</button>
+                        <button class="mode-btn" onclick="app.setPracticeDifficulty('medium')">中等</button>
+                        <button class="mode-btn" onclick="app.setPracticeDifficulty('hard')">困难</button>
+                    </div>
+                </div>
+                <!-- 新增：翻译显示切换按钮 -->
+                <button class="translation-toggle" onclick="app.togglePracticeTranslation()">显示翻译</button>
+                <!-- 新增：保存题目按钮 -->
+                <button class="btn-save-exercise" onclick="app.savePracticeExercise()">保存题目</button>
                 <div class="practice-card" id="practice-card">
                     <div class="timer-bar" id="practice-timer">⏱️ 00:00</div>
                     <div class="word-display">
@@ -224,14 +237,34 @@
                         </div>
                     </div>
                     <!-- 题目来源切换区域 -->
-                    <div class="reading-source-switch">
+                    <div class="reading-source-switch" id="reading-source-switch">
                         <div class="source-tabs">
                             <button class="source-tab active" data-reading-source="random">📚 题库随机</button>
                             <button class="source-tab" data-reading-source="custom">✏️ 自定义输入</button>
                             <button class="source-tab" data-reading-source="photo">📷 拍照上传</button>
                         </div>
                         <div class="source-panel active" id="reading-panel-random">
+                            <!-- 种子随机 & 风格选择 -->
+                            <div class="seed-control">
+                                <div class="seed-input-row">
+                                    <label class="seed-label">🎲 随机种子：</label>
+                                    <input type="text" id="reading-seed-input" class="seed-input" placeholder="输入种子（如 campus2024）或留空随机" />
+                                    <button class="btn-seed-random" id="btn-seed-random" title="生成随机种子">🎲</button>
+                                    <button class="btn-seed-clear" id="btn-seed-clear" title="清空种子，使用纯随机">✕</button>
+                                </div>
+                                <div class="seed-info">相同种子 + 相同风格 = 相同文章，可分享给同学同步练习</div>
+                            </div>
+                            <div class="style-presets">
+                                <span class="style-label">📖 文章风格：</span>
+                                <button class="style-preset-btn active" data-style="auto">🤖 智能匹配</button>
+                                <button class="style-preset-btn" data-style="academic">🎓 学术论文</button>
+                                <button class="style-preset-btn" data-style="narrative">📖 叙事故事</button>
+                                <button class="style-preset-btn" data-style="news">📰 新闻报道</button>
+                                <button class="style-preset-btn" data-style="argumentative">⚖️ 议论文</button>
+                                <button class="style-preset-btn" data-style="science">🔬 科普说明</button>
+                            </div>
                             <div class="reading-generate-options">
+                                <button class="btn-generate-custom" id="btn-start-random-reading" style="background:var(--accent);color:#fff;">📝 开始练习</button>
                                 <button class="btn-generate-ai" id="btn-generate-ai-reading">🤖 AI生成文章</button>
                                 <span class="generate-hint">AI根据主题生成全新阅读文章，需后端服务</span>
                             </div>
@@ -275,6 +308,7 @@
                     </div>
                 </div>
                 <div class="reading-card" id="reading-card">
+                    <button class="btn-back-source" id="btn-back-source" onclick="app.backToReadingSource()">← 返回选择</button>
                     <div class="timer-bar" id="reading-timer">⏱️ 00:00</div>
                     <div class="passage-section" id="passage-section">
                         <div class="passage-header">
@@ -345,50 +379,32 @@
                         </div>
                     </div>
                 </div>
+                <!-- 新增：难度选择器 -->
+                <div class="difficulty-selector">
+                    <span class="mode-label">难度</span>
+                    <div class="mode-options">
+                        <button class="mode-btn active" onclick="app.setTranslationDifficulty('easy')">简单</button>
+                        <button class="mode-btn" onclick="app.setTranslationDifficulty('medium')">中等</button>
+                        <button class="mode-btn" onclick="app.setTranslationDifficulty('hard')">困难</button>
+                    </div>
+                </div>
+                <!-- 新增：翻译显示切换 -->
+                <button class="translation-toggle" onclick="app.toggleTranslationTranslation()">显示翻译</button>
+                <!-- 新增：保存题目按钮 -->
+                <button class="btn-save-exercise" onclick="app.saveTranslationExercise()">保存题目</button>
                 <div class="translation-card" id="translation-card">
                     <div class="timer-bar" id="translation-timer">⏱️ 00:00</div>
                     <div class="translation-passage" id="translation-passage">
                         <!-- 翻译内容将在这里渲染 -->
                     </div>
-                    <div class="upload-tabs">
-                        <button class="upload-tab active" data-upload-tab="file">📄 文件上传</button>
-                        <button class="upload-tab" data-upload-tab="camera">📷 拍照上传</button>
+                    <!-- 拍照提取题目 -->
+                    <div class="extract-topic-section" style="margin: 16px 0; text-align: center;">
+                        <button class="btn-action btn-primary" id="btn-extract-translation-topic" onclick="app.extractTranslationTopicByPhoto()" style="font-size: 1rem; padding: 10px 20px;">
+                            📷 拍照提取题目
+                        </button>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">拍照识别翻译题目内容，自动生成练习</p>
                     </div>
-                    <div class="upload-panel active" id="upload-panel-file">
-                        <div class="file-upload-area" id="file-upload-area">
-                            <div class="file-upload-icon">📄</div>
-                            <div class="file-upload-text">
-                                <strong>上传翻译文件</strong>
-                                <span>拖拽文件到此处，或点击选择文件</span>
-                            </div>
-                            <input type="file" id="file-upload-input" accept=".txt,.md" style="display: none;">
-                            <button class="btn-action" id="btn-select-file">选择文件</button>
-                        </div>
-                        <div class="file-upload-info">
-                            <small>支持 .txt 和 .md 格式，文件内容应为当前题目的英文翻译</small>
-                        </div>
-                    </div>
-                    <div class="upload-panel" id="upload-panel-camera">
-                        <div class="camera-section" id="camera-section">
-                            <div class="camera-preview-container">
-                                <video id="camera-video" autoplay playsinline style="display: none;"></video>
-                                <canvas id="camera-canvas" style="display: none;"></canvas>
-                                <img id="camera-photo" style="display: none; max-width: 100%; border-radius: 8px;">
-                                <div class="camera-placeholder" id="camera-placeholder">
-                                    <div class="camera-icon">📷</div>
-                                    <div class="camera-text">点击"打开摄像头"开始拍照</div>
-                                </div>
-                            </div>
-                            <div class="camera-controls">
-                                <button class="btn-action" id="btn-camera-start">📷 打开摄像头</button>
-                                <button class="btn-action" id="btn-camera-snap" style="display: none;">📸 拍照</button>
-                                <button class="btn-action" id="btn-camera-retake" style="display: none;">🔄 重拍</button>
-                                <button class="btn-action btn-primary" id="btn-camera-ocr" style="display: none;">🔍 识别并评分</button>
-                            </div>
-                            <div class="camera-status" id="camera-status"></div>
-                        </div>
-                    </div>
-                <div class="translation-input-section">
+                    <div class="translation-input-section">
                         <h3>✍️ 请翻译以下句子</h3>
                         <div class="translation-sentences" id="translation-sentences">
                             <!-- 翻译句子将在这里渲染 -->
@@ -518,6 +534,19 @@
                         <div class="letter-options" id="memory-letter-options"></div>
                     </div>
                 </div>
+                <!-- 新增：难度选择器（高频/中频/低频） -->
+                <div class="difficulty-selector">
+                    <span class="mode-label">词频</span>
+                    <div class="mode-options">
+                        <button class="mode-btn active" onclick="app.setMemoryDifficulty('high')">高频</button>
+                        <button class="mode-btn" onclick="app.setMemoryDifficulty('medium')">中频</button>
+                        <button class="mode-btn" onclick="app.setMemoryDifficulty('low')">低频</button>
+                    </div>
+                </div>
+                <!-- 新增：快速判断模式切换按钮 -->
+                <button class="memory-quick-mode-toggle" onclick="app.toggleMemoryQuickMode()">快速判断模式</button>
+                <!-- 新增：保存进度按钮 -->
+                <button class="btn-save-progress" onclick="app.saveMemoryProgress()">保存进度</button>
                 <div class="memory-content-area">
                     <!-- Step 1: Show word and ask remember/not remember -->
                     <div class="memory-card" id="memory-step1">
@@ -604,6 +633,15 @@
                 </div>
 
                 <div class="writing-content" id="writing-content" style="display: none;">
+                    <!-- 新增：难度选择器 -->
+                    <div class="difficulty-selector">
+                        <span class="mode-label">难度</span>
+                        <div class="mode-options">
+                            <button class="mode-btn active" onclick="app.setWritingDifficulty('easy')">简单</button>
+                            <button class="mode-btn" onclick="app.setWritingDifficulty('medium')">中等</button>
+                            <button class="mode-btn" onclick="app.setWritingDifficulty('hard')">困难</button>
+                        </div>
+                    </div>
                     <div class="writing-prompt-card">
                         <h3 id="writing-title">题目标题</h3>
                         <div class="writing-prompt" id="writing-prompt"></div>
@@ -662,6 +700,27 @@
                         </div>
 
                         <button class="btn-submit-writing" id="btn-submit-writing">🚀 提交评分</button>
+                        <!-- 新增：拍照/文件上传区域 -->
+                        <div class="photo-upload-area">
+                            <div class="upload-icon">📎</div>
+                            <p>拖拽文件到此处，或点击上传</p>
+                            <input type="file" id="writing-photo-input" accept="image/*,.pdf,.doc,.docx" hidden>
+                            <button class="btn-upload" onclick="app.uploadWritingPhoto()">选择文件</button>
+                        </div>
+                        <!-- 新增：AI评分结果展示区域（初始隐藏） -->
+                        <div class="writing-grade-result" id="writing-grade-result" style="display: none;">
+                            <div class="grade-header">
+                                <h3 class="grade-title">AI评分结果</h3>
+                                <div class="grade-score">
+                                    <span class="score-value" id="writing-grade-score">--</span>
+                                    <span class="score-total">/100</span>
+                                </div>
+                            </div>
+                            <div class="grade-dimensions" id="writing-grade-dimensions"></div>
+                            <div class="grade-comment" id="writing-grade-comment"></div>
+                        </div>
+                        <!-- 新增：保存题目按钮 -->
+                        <button class="btn-save-exercise" onclick="app.saveWritingExercise()">保存题目</button>
                     </div>
                 </div>
 
@@ -750,6 +809,8 @@
                         <button class="wrong-filter-btn" data-filter="cloze">选词填空</button>
                         <button class="wrong-filter-btn" data-filter="memory">单词记忆</button>
                     </div>
+                    <!-- 新增：AI分析按钮 -->
+                    <button class="btn-ai-analysis" onclick="app.analyzeWrongWithAI()">AI分析</button>
                     <div class="wrong-actions">
                         <button class="btn-action" id="btn-clear-wrong">🗑️ 清空错题本</button>
                     </div>
@@ -824,6 +885,39 @@
                     <div class="diagnosis-details" id="diagnosis-details">
                         <!-- 动态渲染 -->
                     </div>
+                </div>
+                <!-- 新增：学情诊断卡片区域 -->
+                <div class="diagnosis-card">
+                    <div class="diagnosis-header">
+                        <span class="diagnosis-icon">&#128200;</span>
+                        <h3 class="diagnosis-title">学情诊断</h3>
+                    </div>
+                    <div class="diagnosis-body">
+                        <div class="diagnosis-summary">
+                            <p>开始练习后将生成学情诊断报告</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- 新增：薄弱知识点列表区域 -->
+                <div class="weakness-list">
+                    <h4 class="weakness-title">薄弱知识点</h4>
+                    <ul class="weakness-items">
+                        <li class="weakness-item">
+                            <span class="weakness-name">非谓语动词</span>
+                            <div class="weakness-bar"><div class="weakness-fill" style="width: 35%"></div></div>
+                            <span class="weakness-percent">35%</span>
+                        </li>
+                        <li class="weakness-item">
+                            <span class="weakness-name">虚拟语气</span>
+                            <div class="weakness-bar"><div class="weakness-fill" style="width: 42%"></div></div>
+                            <span class="weakness-percent">42%</span>
+                        </li>
+                        <li class="weakness-item">
+                            <span class="weakness-name">长难句分析</span>
+                            <div class="weakness-bar"><div class="weakness-fill" style="width: 48%"></div></div>
+                            <span class="weakness-percent">48%</span>
+                        </li>
+                    </ul>
                 </div>
                 <h1>📊 学习进度</h1>
                 <div class="stats-grid">
@@ -917,6 +1011,17 @@
                         </div>
                     </div>
                 </div>
+                <!-- 新增：学习趋势图表区域 -->
+                <div class="trend-chart-container">
+                    <h4 class="trend-title">学习趋势</h4>
+                    <div class="trend-canvas-wrapper">
+                        <canvas id="learningTrendChart" width="400" height="200"></canvas>
+                    </div>
+                    <div class="trend-legend">
+                        <span class="legend-item"><span class="legend-dot" style="background:#818cf8"></span> 正确率</span>
+                        <span class="legend-item"><span class="legend-dot" style="background:#34d399"></span> 学习时长</span>
+                    </div>
+                </div>
                 <div class="level-distribution">
                     <h2>等级分布</h2>
                     <div class="level-bars" id="level-bars">
@@ -990,6 +1095,24 @@
                         </div>
                         <button class="btn-apply-theme" id="btn-apply-custom-theme">应用自定义颜色</button>
                         <button class="btn-reset-theme" id="btn-reset-theme">恢复默认主题</button>
+                    </div>
+
+                    <!-- 按钮外观设置 -->
+                    <div class="btn-appearance-settings" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                        <h4 style="margin-bottom: 16px; color: var(--text-primary); font-size: 1rem;">🔘 按钮外观</h4>
+                        <div class="setting-item">
+                            <label>设置按钮隐藏</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="btn-hide-settings" onchange="app.toggleSettingsBtnVisibility()">
+                                <span class="toggle-slider"></span>
+                            </div>
+                            <small>隐藏右下角的设置按钮</small>
+                        </div>
+                        <div class="setting-item">
+                            <label>设置按钮透明度</label>
+                            <input type="range" id="btn-opacity-settings" min="0.2" max="1" step="0.1" value="1" oninput="app.setSettingsBtnOpacity(this.value)">
+                            <small id="btn-opacity-value">100%</small>
+                        </div>
                     </div>
                 </div>
             </div>
