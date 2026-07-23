@@ -72,6 +72,24 @@ const Storage = typeof BackendStorage !== 'undefined' ? BackendStorage : {
 
 // ===== 认证相关函数 =====
 function showLoginModal() {
+    // 先展示水平测试引导，用户可跳过直达登录
+    showProficiencyIntro();
+}
+
+function showProficiencyIntro() {
+    document.getElementById('proficiency-modal').classList.remove('hidden');
+    document.getElementById('proficiency-intro').classList.remove('hidden');
+    document.getElementById('proficiency-test').classList.add('hidden');
+    document.getElementById('proficiency-result').classList.add('hidden');
+}
+
+function closeProficiencyModal() {
+    document.getElementById('proficiency-modal').classList.add('hidden');
+}
+
+function skipToLogin() {
+    closeProficiencyModal();
+    // 直接显示登录弹窗
     document.getElementById('auth-modal').classList.remove('hidden');
     document.getElementById('auth-title').textContent = '用户登录';
     document.getElementById('auth-submit-btn').textContent = '登录';
@@ -180,6 +198,349 @@ function updateAuthUI() {
         btnLogin.classList.remove('hidden');
         userInfo.classList.add('hidden');
     }
+}
+
+// ===== 英语水平能力测试 =====
+const ProficiencyTest = {
+    currentIndex: 0,
+    answers: [],
+    selectedOption: null,
+
+    questions: [
+        // 词汇理解 1-5
+        {
+            section: '词汇理解',
+            type: 'vocabulary',
+            question: '单词 <span class="highlight-word">abandon</span> 的中文含义是？',
+            options: ['A. 获得', 'B. 放弃', 'C. 接受', 'D. 坚持'],
+            answer: 1
+        },
+        {
+            section: '词汇理解',
+            type: 'vocabulary',
+            question: '单词 <span class="highlight-word">consequence</span> 的中文含义是？',
+            options: ['A. 顺序', 'B. 保守', 'C. 结果', 'D. 同意'],
+            answer: 2
+        },
+        {
+            section: '词汇理解',
+            type: 'vocabulary',
+            question: '单词 <span class="highlight-word">ambiguous</span> 的中文含义是？',
+            options: ['A. 雄心勃勃的', 'B. 模糊的', 'C. 充足的', 'D. 古代的'],
+            answer: 1
+        },
+        {
+            section: '词汇理解',
+            type: 'vocabulary',
+            question: '单词 <span class="highlight-word">phenomenon</span> 的中文含义是？',
+            options: ['A. 哲学', 'B. 照片', 'C. 短语', 'D. 现象'],
+            answer: 3
+        },
+        {
+            section: '词汇理解',
+            type: 'vocabulary',
+            question: '单词 <span class="highlight-word">ubiquitous</span> 的中文含义是？',
+            options: ['A. 独特的', 'B. 无处不在的', 'C. 联合的', 'D. 最终的'],
+            answer: 1
+        },
+        // 语法知识 6-10
+        {
+            section: '语法知识',
+            type: 'grammar',
+            question: 'She <u>______</u> in London for five years and still loves it.',
+            options: ['A. lived', 'B. has lived', 'C. lives', 'D. was living'],
+            answer: 1
+        },
+        {
+            section: '语法知识',
+            type: 'grammar',
+            question: 'If I <u>______</u> you, I would accept the job offer immediately.',
+            options: ['A. am', 'B. was', 'C. were', 'D. had been'],
+            answer: 2
+        },
+        {
+            section: '语法知识',
+            type: 'grammar',
+            question: 'The book <u>______</u> I borrowed from the library is fascinating.',
+            options: ['A. who', 'B. what', 'C. which', 'D. whose'],
+            answer: 2
+        },
+        {
+            section: '语法知识',
+            type: 'grammar',
+            question: 'The new bridge <u>______</u> in 2010 and has served millions of commuters.',
+            options: ['A. built', 'B. was built', 'C. has built', 'D. is building'],
+            answer: 1
+        },
+        {
+            section: '语法知识',
+            type: 'grammar',
+            question: 'I wish I <u>______</u> more time to prepare for the exam.',
+            options: ['A. have', 'B. had', 'C. will have', 'D. would have'],
+            answer: 1
+        },
+        // 阅读理解 11-13
+        {
+            section: '阅读理解',
+            type: 'reading',
+            passage: 'Artificial intelligence (AI) is transforming the way we live and work. From voice assistants on our phones to recommendation algorithms on streaming platforms, AI has become deeply integrated into our daily routines. However, experts warn that while AI brings convenience, it also raises concerns about privacy, job displacement, and ethical decision-making. As AI continues to evolve, finding the right balance between technological progress and human values remains one of the greatest challenges of our time.',
+            question: 'What is the main topic of the passage?',
+            options: ['A. The history of phones', 'B. The impact and challenges of AI', 'C. How to get a job in tech', 'D. The future of streaming platforms'],
+            answer: 1
+        },
+        {
+            section: '阅读理解',
+            type: 'reading',
+            passage: 'Artificial intelligence (AI) is transforming the way we live and work. From voice assistants on our phones to recommendation algorithms on streaming platforms, AI has become deeply integrated into our daily routines. However, experts warn that while AI brings convenience, it also raises concerns about privacy, job displacement, and ethical decision-making. As AI continues to evolve, finding the right balance between technological progress and human values remains one of the greatest challenges of our time.',
+            question: 'According to the passage, what concerns do experts have about AI?',
+            options: ['A. Too many streaming platforms', 'B. High cost of smartphones', 'C. Privacy, job displacement, and ethical issues', 'D. Lack of internet access'],
+            answer: 2
+        },
+        {
+            section: '阅读理解',
+            type: 'reading',
+            passage: 'Artificial intelligence (AI) is transforming the way we live and work. From voice assistants on our phones to recommendation algorithms on streaming platforms, AI has become deeply integrated into our daily routines. However, experts warn that while AI brings convenience, it also raises concerns about privacy, job displacement, and ethical decision-making. As AI continues to evolve, finding the right balance between technological progress and human values remains one of the greatest challenges of our time.',
+            question: 'What does the author suggest is the greatest challenge?',
+            options: ['A. Building more powerful computers', 'B. Training more AI engineers', 'C. Creating more voice assistants', 'D. Balancing tech progress with human values'],
+            answer: 3
+        }
+    ],
+
+    init() {
+        this.currentIndex = 0;
+        this.answers = new Array(this.questions.length).fill(null);
+        this.selectedOption = null;
+    },
+
+    getCurrentQuestion() {
+        return this.questions[this.currentIndex];
+    },
+
+    getSectionLabel() {
+        const idx = this.currentIndex;
+        if (idx <= 4) return '词汇理解';
+        if (idx <= 9) return '语法知识';
+        return '阅读理解';
+    },
+
+    getScore() {
+        let correct = 0;
+        for (let i = 0; i < this.questions.length; i++) {
+            if (this.answers[i] === this.questions[i].answer) correct++;
+        }
+        return correct;
+    },
+
+    getLevel() {
+        const score = this.getScore();
+        if (score >= 9) return { id: 'advanced', name: '高级', emoji: '🏆', color: '#ff6b6b' };
+        if (score >= 5) return { id: 'intermediate', name: '中级', emoji: '🎯', color: '#ffa726' };
+        return { id: 'beginner', name: '初级', emoji: '🌱', color: '#66bb6a' };
+    },
+
+    getRecommendedModes() {
+        const level = this.getLevel();
+        if (level.id === 'advanced') {
+            return [
+                { icon: '📖', name: '阅读练习', detail: '推荐困难难度 · 长篇文章 · 深层推理' },
+                { icon: '📝', name: '选词填空', detail: '推荐困难难度 · 学术词汇 · 精确辨析' },
+                { icon: '🌐', name: '翻译练习', detail: '推荐专业类文本 · 复杂句式 · 地道表达' },
+                { icon: '✍️', name: '作文练习', detail: '推荐250词 · 深度论证 · 高级表达' }
+            ];
+        } else if (level.id === 'intermediate') {
+            return [
+                { icon: '📖', name: '阅读练习', detail: '推荐中等难度 · 标准文章 · 综合理解' },
+                { icon: '📝', name: '选词填空', detail: '推荐中等难度 · 常见词汇 · 语境辨析' },
+                { icon: '🌐', name: '翻译练习', detail: '推荐日常类文本 · 中等句式 · 准确表达' },
+                { icon: '✍️', name: '作文练习', detail: '推荐200词 · 清晰结构 · 基本论证' }
+            ];
+        } else {
+            return [
+                { icon: '📖', name: '阅读练习', detail: '推荐简单难度 · 短篇文章 · 基础理解' },
+                { icon: '📝', name: '选词填空', detail: '推荐简单难度 · 基础词汇 · 入门练习' },
+                { icon: '🌐', name: '翻译练习', detail: '推荐简单文本 · 基本句式 · 逐句翻译' },
+                { icon: '✍️', name: '作文练习', detail: '推荐150词 · 简单话题 · 基础表达' }
+            ];
+        }
+    }
+};
+
+function startProficiencyTest() {
+    ProficiencyTest.init();
+    document.getElementById('proficiency-intro').classList.add('hidden');
+    document.getElementById('proficiency-test').classList.remove('hidden');
+    document.getElementById('proficiency-result').classList.add('hidden');
+    renderProficiencyQuestion();
+}
+
+function renderProficiencyQuestion() {
+    const q = ProficiencyTest.getCurrentQuestion();
+    const sectionLabel = ProficiencyTest.getSectionLabel();
+    const total = ProficiencyTest.questions.length;
+    const idx = ProficiencyTest.currentIndex;
+    const savedAnswer = ProficiencyTest.answers[idx];
+    ProficiencyTest.selectedOption = savedAnswer;
+
+    // 更新进度条
+    document.getElementById('proficiency-progress-bar').style.width = (idx / total * 100) + '%';
+    document.getElementById('proficiency-progress-text').textContent = (idx + 1) + '/' + total;
+
+    // 更新分类标签
+    document.getElementById('proficiency-section-label').textContent = sectionLabel;
+
+    // 渲染题目
+    let questionHTML = '';
+    if (q.type === 'reading' && q.passage) {
+        questionHTML = '<span class="passage-text">' + q.passage + '</span>' + q.question;
+    } else {
+        questionHTML = q.question;
+    }
+    document.getElementById('proficiency-question-text').innerHTML = questionHTML;
+
+    // 渲染选项
+    const optionsEl = document.getElementById('proficiency-options');
+    optionsEl.innerHTML = '';
+    q.options.forEach((opt, optIdx) => {
+        const div = document.createElement('div');
+        div.className = 'proficiency-option';
+        if (savedAnswer !== null) {
+            if (optIdx === q.answer) {
+                div.classList.add('correct');
+            } else if (savedAnswer === optIdx && optIdx !== q.answer) {
+                div.classList.add('wrong');
+            }
+        } else if (savedAnswer === optIdx) {
+            div.classList.add('selected');
+        }
+        div.innerHTML = '<span class="option-letter">' + 'ABCD'[optIdx] + '</span>' + opt.substring(3);
+        div.addEventListener('click', () => {
+            if (ProficiencyTest.answers[idx] !== null) return; // 已作答不可改
+            selectProficiencyOption(optIdx);
+        });
+        optionsEl.appendChild(div);
+    });
+
+    // 更新按钮状态
+    const btn = document.getElementById('btn-proficiency-next');
+    if (savedAnswer !== null) {
+        btn.disabled = false;
+        btn.textContent = idx < total - 1 ? '下一题' : '查看结果';
+    } else {
+        btn.disabled = true;
+        btn.textContent = '下一题';
+    }
+}
+
+function selectProficiencyOption(optIdx) {
+    const idx = ProficiencyTest.currentIndex;
+    ProficiencyTest.answers[idx] = optIdx;
+    ProficiencyTest.selectedOption = optIdx;
+
+    // 更新选项样式
+    const q = ProficiencyTest.questions[idx];
+    const optionEls = document.querySelectorAll('#proficiency-options .proficiency-option');
+    optionEls.forEach((el, i) => {
+        el.classList.remove('selected');
+        if (i === q.answer) el.classList.add('correct');
+        if (i === optIdx && i !== q.answer) el.classList.add('wrong');
+        if (i === optIdx && i === q.answer) el.classList.add('correct');
+    });
+
+    // 启用下一题按钮
+    const btn = document.getElementById('btn-proficiency-next');
+    btn.disabled = false;
+    btn.textContent = idx < ProficiencyTest.questions.length - 1 ? '下一题' : '查看结果';
+}
+
+function submitProficiencyAnswer() {
+    const idx = ProficiencyTest.currentIndex;
+    if (ProficiencyTest.answers[idx] === null) return;
+
+    ProficiencyTest.currentIndex++;
+    if (ProficiencyTest.currentIndex < ProficiencyTest.questions.length) {
+        renderProficiencyQuestion();
+    } else {
+        showProficiencyResult();
+    }
+}
+
+function showProficiencyResult() {
+    const score = ProficiencyTest.getScore();
+    const total = ProficiencyTest.questions.length;
+    const level = ProficiencyTest.getLevel();
+    const modes = ProficiencyTest.getRecommendedModes();
+
+    document.getElementById('proficiency-test').classList.add('hidden');
+    document.getElementById('proficiency-result').classList.remove('hidden');
+
+    document.getElementById('proficiency-result-level').textContent = level.emoji;
+    document.getElementById('proficiency-result-score').innerHTML = '答对 <strong>' + score + '</strong> / ' + total + ' 题';
+    document.getElementById('proficiency-result-desc').textContent = '你的英语水平评估为 ' + level.name + '，以下是为你推荐的学习模式：';
+
+    const modesEl = document.getElementById('proficiency-result-modes');
+    modesEl.innerHTML = '';
+    modes.forEach(mode => {
+        const card = document.createElement('div');
+        card.className = 'proficiency-mode-card';
+        card.innerHTML = 
+            '<span class="proficiency-mode-icon">' + mode.icon + '</span>' +
+            '<div class="proficiency-mode-info">' +
+                '<div class="proficiency-mode-name">' + mode.name + '</div>' +
+                '<div class="proficiency-mode-detail">' + mode.detail + '</div>' +
+            '</div>';
+        modesEl.appendChild(card);
+    });
+
+    // 保存测试结果到localStorage
+    const result = {
+        score: score,
+        total: total,
+        level: level.id,
+        levelName: level.name,
+        timestamp: Date.now()
+    };
+    localStorage.setItem('ciguang_proficiency_result', JSON.stringify(result));
+}
+
+function applyProficiencySettings() {
+    const result = JSON.parse(localStorage.getItem('ciguang_proficiency_result') || '{}');
+    const level = result.level || 'beginner';
+
+    // 根据水平设置对应的难度
+    const difficultyMap = {
+        'beginner': 'easy',
+        'intermediate': 'medium',
+        'advanced': 'hard'
+    };
+    const difficulty = difficultyMap[level] || 'easy';
+
+    // 保存设置
+    localStorage.setItem('ciguang_proficiency_applied', 'true');
+    localStorage.setItem('ciguang_recommended_difficulty', difficulty);
+    localStorage.setItem('ciguang_recommended_level', level);
+
+    // 关闭测试弹窗
+    closeProficiencyModal();
+
+    // 如果app实例存在，更新难度设置
+    if (window.app) {
+        window.app.readingDifficulty = difficulty;
+        window.app.clozeDifficulty = difficulty;
+        // 更新UI中的难度按钮
+        document.querySelectorAll('[data-reading-mode]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.readingMode === difficulty);
+        });
+        document.querySelectorAll('[data-cloze-difficulty]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.clozeDifficulty === difficulty);
+        });
+        // 更新写作难度下拉框
+        const writingSelect = document.getElementById('writing-difficulty');
+        if (writingSelect) writingSelect.value = difficulty;
+    }
+
+    // 显示成功提示
+    const levelNames = { beginner: '初级', intermediate: '中级', advanced: '高级' };
+    alert('✅ 已为你应用 ' + levelNames[level] + ' 推荐模式！\n\n阅读、填空、写作等模块已自动设置为推荐难度。\n你也可以随时在各模块中手动调整难度。');
 }
 
 // ===== 等级系统 =====

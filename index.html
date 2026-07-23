@@ -87,6 +87,62 @@
         </div>
     </div>
 
+    <!-- 英语水平测试弹窗 -->
+    <div class="modal-overlay hidden" id="proficiency-modal">
+        <div class="modal proficiency-modal">
+            <!-- 第1屏：欢迎引导 -->
+            <div class="proficiency-screen" id="proficiency-intro">
+                <div class="proficiency-intro-icon">📝</div>
+                <h3>英语水平能力测试</h3>
+                <p class="proficiency-intro-desc">快速了解你的英语水平，为你推荐最适合的学习模式</p>
+                <div class="proficiency-intro-info">
+                    <div class="proficiency-info-item">
+                        <span class="proficiency-info-icon">📖</span>
+                        <span>词汇理解 · 5题</span>
+                    </div>
+                    <div class="proficiency-info-item">
+                        <span class="proficiency-info-icon">📐</span>
+                        <span>语法知识 · 5题</span>
+                    </div>
+                    <div class="proficiency-info-item">
+                        <span class="proficiency-info-icon">📰</span>
+                        <span>阅读理解 · 3题</span>
+                    </div>
+                    <div class="proficiency-info-item">
+                        <span class="proficiency-info-icon">⏱️</span>
+                        <span>预计用时 5-8 分钟</span>
+                    </div>
+                </div>
+                <button class="btn-proficiency-start" onclick="startProficiencyTest()">开始测试</button>
+                <a href="javascript:void(0)" class="proficiency-skip" onclick="skipToLogin()">跳过测试，直接登录</a>
+            </div>
+            <!-- 第2屏：答题中 -->
+            <div class="proficiency-screen hidden" id="proficiency-test">
+                <div class="proficiency-test-header">
+                    <div class="proficiency-progress">
+                        <div class="proficiency-progress-bar" id="proficiency-progress-bar"></div>
+                    </div>
+                    <span class="proficiency-progress-text" id="proficiency-progress-text">1/13</span>
+                </div>
+                <div class="proficiency-test-section" id="proficiency-section-label"></div>
+                <div class="proficiency-question" id="proficiency-question-text"></div>
+                <div class="proficiency-options" id="proficiency-options"></div>
+                <button class="btn-proficiency-next" id="btn-proficiency-next" onclick="submitProficiencyAnswer()" disabled>下一题</button>
+            </div>
+            <!-- 第3屏：结果 -->
+            <div class="proficiency-screen hidden" id="proficiency-result">
+                <div class="proficiency-result-level" id="proficiency-result-level"></div>
+                <div class="proficiency-result-score" id="proficiency-result-score"></div>
+                <div class="proficiency-result-desc" id="proficiency-result-desc"></div>
+                <div class="proficiency-result-modes" id="proficiency-result-modes"></div>
+                <div class="proficiency-result-actions">
+                    <button class="btn-proficiency-apply" onclick="applyProficiencySettings()">应用推荐模式</button>
+                    <a href="javascript:void(0)" class="proficiency-skip" onclick="skipToLogin()">去登录 / 注册</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 主内容区 -->
     <main class="main-content">
         <!-- 收藏室页面 -->

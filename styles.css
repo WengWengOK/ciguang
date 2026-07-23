@@ -303,7 +303,367 @@ textarea {
     font-weight: 500;
 }
 
-/* ===== Navbar ===== */
+/* ===== 英语水平测试弹窗 ===== */
+.proficiency-modal {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 520px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: slideUp 0.3s ease;
+    min-height: 400px;
+}
+
+.proficiency-screen {
+    padding: 28px 24px;
+}
+
+.proficiency-screen.hidden {
+    display: none;
+}
+
+/* 第1屏：欢迎引导 */
+.proficiency-intro-icon {
+    text-align: center;
+    font-size: 3rem;
+    margin-bottom: 12px;
+    animation: bounceIn 0.5s ease;
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.08); }
+    70% { transform: scale(0.95); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.proficiency-screen h3 {
+    text-align: center;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.proficiency-intro-desc {
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.proficiency-intro-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 28px;
+}
+
+.proficiency-info-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+}
+
+.proficiency-info-icon {
+    font-size: 1.1rem;
+}
+
+.btn-proficiency-start {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+    margin-bottom: 14px;
+}
+
+.btn-proficiency-start:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.proficiency-skip {
+    display: block;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.proficiency-skip:hover {
+    color: var(--accent);
+}
+
+/* 第2屏：答题中 */
+.proficiency-test-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.proficiency-progress {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.proficiency-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+    width: 0%;
+}
+
+.proficiency-progress-text {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.proficiency-test-section {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+
+.proficiency-question {
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.proficiency-question .highlight-word {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 1.15rem;
+}
+
+.proficiency-question .passage-text {
+    display: block;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--accent);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.proficiency-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.proficiency-option {
+    padding: 14px 16px;
+    background: var(--bg-secondary);
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    font-size: 0.93rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    line-height: 1.4;
+}
+
+.proficiency-option:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-color);
+}
+
+.proficiency-option.selected {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.proficiency-option.correct {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.12);
+}
+
+.proficiency-option.wrong {
+    border-color: #f44336;
+    background: rgba(244, 67, 54, 0.08);
+}
+
+.proficiency-option .option-letter {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    border-radius: 50%;
+    background: var(--bg-primary);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.proficiency-option.selected .option-letter {
+    background: var(--accent);
+    color: #fff;
+}
+
+.proficiency-option.correct .option-letter {
+    background: #4caf50;
+    color: #fff;
+}
+
+.proficiency-option.wrong .option-letter {
+    background: #f44336;
+    color: #fff;
+}
+
+.btn-proficiency-next {
+    width: 100%;
+    padding: 13px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+    cursor: not-allowed;
+}
+
+.btn-proficiency-next:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+}
+
+.btn-proficiency-next:not(:disabled):hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* 第3屏：结果 */
+.proficiency-result-level {
+    text-align: center;
+    font-size: 4rem;
+    margin-bottom: 8px;
+    animation: bounceIn 0.5s ease;
+}
+
+.proficiency-result-score {
+    text-align: center;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.proficiency-result-score strong {
+    color: var(--accent);
+    font-size: 1.3rem;
+}
+
+.proficiency-result-desc {
+    text-align: center;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    line-height: 1.5;
+    padding: 0 8px;
+}
+
+.proficiency-result-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 28px;
+}
+
+.proficiency-mode-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--accent);
+}
+
+.proficiency-mode-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.proficiency-mode-info {
+    flex: 1;
+}
+
+.proficiency-mode-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.proficiency-mode-detail {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.proficiency-result-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn-proficiency-apply {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.btn-proficiency-apply:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+    .proficiency-intro-info {
+        grid-template-columns: 1fr;
+    }
+    .proficiency-modal {
+        max-width: 95%;
+    }
+}
 .navbar {
     position: sticky;
     top: 0;
