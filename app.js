@@ -9544,18 +9544,62 @@ WordCollectionApp.prototype.createSeasonParticles = function(season) {
             container.appendChild(orb);
         }
     } else if (season === 'spring') {
-        for (let i = 0; i < 25; i++) {
+        // 樱花瓣配色：粉红、淡白、浅粉
+        const sakuraColors = [
+            { r: 255, g: 183, b: 197, a: 0.8 },  // #ffb7c5 樱花粉
+            { r: 255, g: 209, b: 220, a: 0.75 }, // #ffd1dc 浅粉
+            { r: 255, g: 228, b: 225, a: 0.7 },  // #ffe4e1 玫瑰雾
+            { r: 255, g: 240, b: 245, a: 0.65 }, // #fff0f5 淡紫粉
+            { r: 255, g: 192, b: 203, a: 0.85 }, // #ffc0cb 粉红
+            { r: 255, g: 245, b: 250, a: 0.55 }, // #fff5fa 极淡粉
+            { r: 250, g: 160, b: 180, a: 0.8 },  // #faa0b4 桃粉
+            { r: 255, g: 255, b: 255, a: 0.35 }  // 透明白
+        ];
+        const shapes = ['sakura', 'oval', 'long'];
+        const anims = ['petalFallNear', 'petalFallMid', 'petalFallFar', 'petalFallFast', 'petalFallSlow'];
+        const animWeights = [0.15, 0.30, 0.25, 0.15, 0.15]; // 各动画类型权重
+
+        // 创建50片花瓣
+        for (let i = 0; i < 50; i++) {
             const petal = document.createElement('div');
-            petal.className = 'petal';
-            petal.style.left = Math.random() * 100 + '%';
-            petal.style.animationDuration = (6 + Math.random() * 7) + 's';
-            petal.style.animationDelay = Math.random() * 10 + 's';
-            const size = 6 + Math.random() * 10;
-            petal.style.width = size + 'px';
-            petal.style.height = size * 0.7 + 'px';
-            const hue = 330 + Math.random() * 40;
-            const lightness = 60 + Math.random() * 20;
-            petal.style.background = `hsla(${hue}, 80%, ${lightness}%, 0.7)`;
+            // 根据权重选择动画类型
+            let rand = Math.random();
+            let animIdx = 0;
+            let cum = 0;
+            for (let j = 0; j < animWeights.length; j++) {
+                cum += animWeights[j];
+                if (rand <= cum) { animIdx = j; break; }
+            }
+            // 形状
+            const shapeClass = shapes[Math.floor(Math.random() * shapes.length)];
+            petal.className = 'petal ' + shapeClass;
+            // 颜色（50%偏粉，35%偏淡白，15%偏深粉）
+            const colorIdx = Math.random() < 0.5
+                ? Math.floor(Math.random() * 4)      // 粉色调
+                : (Math.random() < 0.7
+                    ? 4 + Math.floor(Math.random() * 3) // 淡白色调
+                    : Math.floor(Math.random() * 2));   // 偶尔深粉
+            const c = sakuraColors[Math.min(colorIdx, sakuraColors.length - 1)];
+            petal.style.background = `rgba(${c.r},${c.g},${c.b},${c.a})`;
+            // 位置
+            petal.style.left = Math.random() * 105 + '%';
+            petal.style.top = '-5vh';
+            // 大小
+            const baseSize = (animIdx === 0) ? 10 + Math.random() * 12      // 近景大
+                : (animIdx === 2) ? 4 + Math.random() * 5                  // 远景小
+                : 6 + Math.random() * 8;                                   // 中景适中
+            petal.style.width = baseSize + 'px';
+            petal.style.height = (baseSize * (0.6 + Math.random() * 0.3)) + 'px';
+            // 动画
+            petal.style.animationName = anims[animIdx];
+            petal.style.animationDuration = (7 + Math.random() * 9) + 's';
+            petal.style.animationDelay = (Math.random() * 15) + 's';
+            petal.style.animationTimingFunction = 'linear';
+            petal.style.animationIterationCount = 'infinite';
+            // 给部分花瓣添加模糊效果模拟远景
+            if (animIdx === 2) {
+                petal.style.filter = 'blur(0.5px)';
+            }
             container.appendChild(petal);
         }
     } else if (season === 'autumn') {
