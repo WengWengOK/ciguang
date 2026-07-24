@@ -44,6 +44,9 @@
             <button class="nav-tab" data-page="stats">
                 <span>📊</span> 统计
             </button>
+            <button class="nav-tab" data-page="exam">
+                <span>📋</span> 试卷分析
+            </button>
         </div>
         <div class="nav-info">
             <span class="total-words">📚 0 个单词</span>
@@ -1073,6 +1076,130 @@
                 </div>
             </div>
         </section>
+
+        <!-- 试卷分析页 -->
+        <section id="exam-page" class="page">
+            <div class="exam-container">
+                <div class="exam-header">
+                    <h1>📋 试卷智能分析</h1>
+                    <p class="subtitle">上传试卷照片，AI 智能识别并分析学习情况</p>
+                </div>
+
+                <!-- 上传区域 -->
+                <div class="exam-upload-section" id="exam-upload-section">
+                    <div class="exam-upload-zone" id="exam-upload-zone">
+                        <div class="exam-upload-icon">📤</div>
+                        <p class="exam-upload-title">点击或拖拽上传试卷图片</p>
+                        <p class="exam-upload-hint">支持 JPG / PNG 格式，可多张上传</p>
+                        <input type="file" id="exam-file-input" accept="image/png,image/jpeg,image/jpg" multiple hidden>
+                        <button class="btn-exam-upload" id="btn-exam-upload">选择图片</button>
+                    </div>
+                    <div class="exam-camera-section">
+                        <button class="btn-exam-camera" id="btn-exam-camera">📷 拍照上传</button>
+                    </div>
+                </div>
+
+                <!-- 相机区域 -->
+                <div class="exam-camera-area hidden" id="exam-camera-area">
+                    <video id="exam-camera-video" autoplay playsinline></video>
+                    <div class="exam-camera-controls">
+                        <button class="btn-exam-snap" id="btn-exam-snap">📸 拍照</button>
+                        <button class="btn-exam-camera-stop" id="btn-exam-camera-stop">关闭相机</button>
+                    </div>
+                </div>
+
+                <!-- 图片预览区 -->
+                <div class="exam-preview-section hidden" id="exam-preview-section">
+                    <h3>已上传图片</h3>
+                    <div class="exam-preview-grid" id="exam-preview-grid"></div>
+                    <div class="exam-preview-actions">
+                        <button class="btn-exam-add-more" id="btn-exam-add-more">➕ 添加更多</button>
+                        <button class="btn-exam-clear" id="btn-exam-clear">🗑️ 清空</button>
+                        <button class="btn-exam-analyze" id="btn-exam-analyze">🔍 开始智能分析</button>
+                    </div>
+                </div>
+
+                <!-- 分析中 -->
+                <div class="exam-analyzing hidden" id="exam-analyzing">
+                    <div class="exam-analyzing-spinner"></div>
+                    <p class="exam-analyzing-text" id="exam-analyzing-text">正在识别试卷内容...</p>
+                </div>
+
+                <!-- 分析结果 -->
+                <div class="exam-result-section hidden" id="exam-result-section">
+                    <!-- 总览卡片 -->
+                    <div class="exam-overview-card" id="exam-overview-card">
+                        <div class="exam-overview-icon" id="exam-overview-icon">📊</div>
+                        <div class="exam-overview-info">
+                            <div class="exam-overview-level" id="exam-overview-level">分析中</div>
+                            <div class="exam-overview-desc" id="exam-overview-desc"></div>
+                        </div>
+                    </div>
+
+                    <!-- 详细分析 -->
+                    <div class="exam-detail-grid">
+                        <!-- 题型分布 -->
+                        <div class="exam-detail-card">
+                            <div class="exam-detail-header">
+                                <span class="exam-detail-icon">📝</span>
+                                <span>题型分布</span>
+                            </div>
+                            <div class="exam-detail-body" id="exam-question-types"></div>
+                        </div>
+
+                        <!-- 错误分析 -->
+                        <div class="exam-detail-card">
+                            <div class="exam-detail-header">
+                                <span class="exam-detail-icon">❌</span>
+                                <span>错误分析</span>
+                            </div>
+                            <div class="exam-detail-body" id="exam-error-analysis"></div>
+                        </div>
+
+                        <!-- 知识点掌握 -->
+                        <div class="exam-detail-card">
+                            <div class="exam-detail-header">
+                                <span class="exam-detail-icon">🎓</span>
+                                <span>知识点掌握</span>
+                            </div>
+                            <div class="exam-detail-body" id="exam-knowledge-points"></div>
+                        </div>
+
+                        <!-- 薄弱环节 -->
+                        <div class="exam-detail-card">
+                            <div class="exam-detail-header">
+                                <span class="exam-detail-icon">⚠️</span>
+                                <span>薄弱环节</span>
+                            </div>
+                            <div class="exam-detail-body" id="exam-weak-points"></div>
+                        </div>
+                    </div>
+
+                    <!-- AI 建议 -->
+                    <div class="exam-advice-card">
+                        <div class="exam-detail-header">
+                            <span class="exam-detail-icon">💡</span>
+                            <span>AI 学习建议</span>
+                        </div>
+                        <div class="exam-advice-body" id="exam-advice-body"></div>
+                    </div>
+
+                    <!-- 行动计划 -->
+                    <div class="exam-action-card">
+                        <div class="exam-detail-header">
+                            <span class="exam-detail-icon">🎯</span>
+                            <span>推荐行动计划</span>
+                        </div>
+                        <div class="exam-action-body" id="exam-action-body"></div>
+                    </div>
+
+                    <!-- 重新分析 -->
+                    <div class="exam-result-actions">
+                        <button class="btn-exam-retry" id="btn-exam-retry">🔄 重新分析</button>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- 设置弹窗 -->
@@ -1210,7 +1337,7 @@
     <script src="backend/api-client.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="agent-frontend.js"></script>
-    <script src="app.js?v=32"></script>
+    <script src="app.js?v=33"></script>
     <script>
         // Force fresh data on new word database
         if (typeof EMBEDDED_WORDS !== 'undefined') {

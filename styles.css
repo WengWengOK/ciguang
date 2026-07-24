@@ -6117,3 +6117,643 @@ body.light-theme .blank-photo-dialog {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* ===== 试卷分析页 ===== */
+.exam-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.exam-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.exam-header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.exam-header .subtitle {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* 上传区域 */
+.exam-upload-section {
+    margin-bottom: 24px;
+}
+
+.exam-upload-zone {
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.exam-upload-zone:hover,
+.exam-upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(74, 158, 255, 0.05);
+    transform: translateY(-2px);
+}
+
+.exam-upload-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+
+.exam-upload-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.exam-upload-hint {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.btn-exam-upload {
+    padding: 10px 28px;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-exam-upload:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.exam-camera-section {
+    text-align: center;
+    margin-top: 12px;
+}
+
+.btn-exam-camera {
+    padding: 8px 20px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    transition: all 0.2s ease;
+}
+
+.btn-exam-camera:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* 相机区域 */
+.exam-camera-area {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.exam-camera-area.hidden {
+    display: none;
+}
+
+.exam-camera-area video {
+    max-width: 100%;
+    border-radius: var(--radius-md);
+    border: 2px solid var(--border-color);
+}
+
+.exam-camera-controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.btn-exam-snap,
+.btn-exam-camera-stop {
+    padding: 10px 24px;
+    border-radius: var(--radius-sm);
+    font-size: 0.92rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-exam-snap {
+    background: var(--accent);
+    color: #fff;
+}
+
+.btn-exam-camera-stop {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+/* 图片预览 */
+.exam-preview-section.hidden {
+    display: none;
+}
+
+.exam-preview-section h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+}
+
+.exam-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.exam-preview-item {
+    position: relative;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    aspect-ratio: 3/4;
+}
+
+.exam-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.exam-preview-remove {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.exam-preview-remove:hover {
+    background: rgba(244, 67, 54, 0.85);
+}
+
+.exam-preview-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    color: #fff;
+    font-size: 12px;
+    padding: 16px 6px 4px;
+    text-align: center;
+}
+
+.exam-empty {
+    color: var(--text-muted);
+    font-size: 14px;
+    text-align: center;
+    padding: 20px 0;
+}
+
+.exam-type-correct {
+    height: 100%;
+    background: rgba(76, 175, 80, 0.5);
+    border-radius: 3px 0 0 3px;
+}
+
+.exam-error-block {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.exam-error-block:last-child {
+    border-bottom: none;
+}
+
+.exam-preview-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-exam-add-more,
+.btn-exam-clear {
+    padding: 9px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-exam-add-more {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.btn-exam-clear {
+    background: transparent;
+    border: 1px solid rgba(244, 67, 54, 0.4);
+    color: #f44336;
+}
+
+.btn-exam-analyze {
+    padding: 11px 32px;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-left: auto;
+    transition: all 0.2s ease;
+}
+
+.btn-exam-analyze:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(74, 158, 255, 0.3);
+}
+
+/* 分析中 */
+.exam-analyzing {
+    text-align: center;
+    padding: 48px 24px;
+}
+
+.exam-analyzing.hidden {
+    display: none;
+}
+
+.exam-analyzing-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--bg-secondary);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    animation: examSpin 0.8s linear infinite;
+}
+
+@keyframes examSpin {
+    to { transform: rotate(360deg); }
+}
+
+.exam-analyzing-text {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+/* 分析结果 */
+.exam-result-section.hidden {
+    display: none;
+}
+
+/* 总览卡片 */
+.exam-overview-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+    border-left: 4px solid var(--accent);
+}
+
+.exam-overview-icon {
+    font-size: 3rem;
+    flex-shrink: 0;
+}
+
+.exam-overview-level {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+
+.exam-overview-desc {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* 详细分析网格 */
+.exam-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.exam-detail-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.exam-detail-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-sm);
+}
+
+.exam-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.exam-detail-icon {
+    font-size: 1.1rem;
+}
+
+.exam-detail-body {
+    padding: 14px 16px;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* 题型分布条 */
+.exam-type-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.exam-type-name {
+    width: 80px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.exam-type-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.exam-type-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+.exam-type-count {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    width: 50px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* 错误分析标签 */
+.exam-error-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin: 3px;
+    background: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+    border: 1px solid rgba(244, 67, 54, 0.2);
+}
+
+/* 知识点掌握 */
+.exam-knowledge-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.exam-knowledge-name {
+    flex: 1;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+}
+
+.exam-knowledge-bar {
+    width: 80px;
+    height: 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.exam-knowledge-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+}
+
+.exam-knowledge-pct {
+    width: 36px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+/* 薄弱环节 */
+.exam-weak-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.exam-weak-item:last-child {
+    border-bottom: none;
+}
+
+.exam-weak-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffa726;
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+
+.exam-weak-text {
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* AI建议 */
+.exam-advice-card,
+.exam-action-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+.exam-advice-body {
+    padding: 16px;
+}
+
+.exam-advice-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.exam-advice-item:last-child {
+    border-bottom: none;
+}
+
+.exam-advice-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.exam-advice-text {
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* 行动计划 */
+.exam-action-body {
+    padding: 16px;
+}
+
+.exam-action-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    transition: var(--transition);
+}
+
+.exam-action-item:last-child {
+    margin-bottom: 0;
+}
+
+.exam-action-item:hover {
+    border-color: var(--accent);
+}
+
+.exam-action-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.exam-action-info {
+    flex: 1;
+}
+
+.exam-action-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.exam-action-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* 重新分析 */
+.exam-result-actions {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.btn-exam-retry {
+    padding: 10px 28px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-exam-retry:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .exam-detail-grid {
+        grid-template-columns: 1fr;
+    }
+    .exam-preview-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .exam-overview-card {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .exam-preview-grid {
+        grid-template-columns: 1fr;
+    }
+    .exam-preview-actions {
+        flex-direction: column;
+    }
+    .btn-exam-analyze {
+        margin-left: 0;
+        text-align: center;
+    }
+}

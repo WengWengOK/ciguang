@@ -152,6 +152,19 @@ class AgentClient {
         });
     }
 
+    // ===== 试卷智能分析Agent =====
+    // 上传试卷图片，AI识别并分析学生详细学习情况
+    async analyzeExam(images) {
+        return this.request('/exam/analyze', {
+            method: 'POST',
+            body: {
+                taskType: 'exam-analysis',
+                content: '试卷图片分析',
+                parameters: { images }
+            }
+        });
+    }
+
     async evaluateWriting(prompt, essay) {
         return this.request('/writing/evaluate', {
             method: 'POST',

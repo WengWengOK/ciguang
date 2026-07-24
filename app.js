@@ -1546,6 +1546,8 @@ class WordCollectionApp {
             if (!this.memoryCurrentWord) this.startMemoryPractice();
         } else if (page === 'wrong') {
             this.renderWrongList();
+        } else if (page === 'exam') {
+            this.initExamPage();
         }
     }
     
@@ -10012,6 +10014,637 @@ WordCollectionApp.prototype.renderAgentPanel = function(data) {
         panel.classList.add('show');
     }, 600);
 }
+
+// ===== 试卷智能分析模块 =====
+
+/**
+ * 初始化试卷分析页面
+ * 绑定上传、相机、预览、分析等事件
+ */
+WordCollectionApp.prototype.initExamPage = function() {
+    // 防止重复绑定
+    if (this.examPageInitialized) return;
+    this.examPageInitialized = true;
+    this.examImages = [];
+    this.examCameraStream = null;
+
+    const uploadZone = document.getElementById('exam-upload-zone');
+    const fileInput = document.getElementById('exam-file-input');
+    const btnUpload = document.getElementById('btn-exam-upload');
+
+    // 点击上传区域触发文件选择
+    uploadZone.addEventListener('click', (e) => {
+        if (e.target !== btnUpload) fileInput.click();
+    });
+    btnUpload.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.click();
+    });
+    fileInput.addEventListener('change', (e) => {
+        this.examHandleFiles(e.target.files);
+        fileInput.value = '';
+    });
+
+    // 拖拽上传
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+    });
+    uploadZone.addEventListener('dragleave', () => {
+        uploadZone.classList.remove('dragover');
+    });
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        this.examHandleFiles(files);
+    });
+
+    // 相机
+    document.getElementById('btn-exam-camera').addEventListener('click', () => this.examOpenCamera());
+    document.getElementById('btn-exam-camera-stop').addEventListener('click', () => this.examCloseCamera());
+    document.getElementById('btn-exam-snap').addEventListener('click', () => this.examSnap());
+
+    // 预览操作
+    document.getElementById('btn-exam-add-more').addEventListener('click', () => fileInput.click());
+    document.getElementById('btn-exam-clear').addEventListener('click', () => this.examClearImages());
+    document.getElementById('btn-exam-analyze').addEventListener('click', () => this.examStartAnalysis());
+
+    // 重新分析
+    document.getElementById('btn-exam-retry').addEventListener('click', () => this.examRetry());
+};
+
+/**
+ * 处理上传的图片文件
+ */
+WordCollectionApp.prototype.examHandleFiles = function(files) {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+
+    imageFiles.forEach(file => {
+        this.examCompressImage(file).then(dataUrl => {
+            this.examImages.push(dataUrl);
+            this.renderExamPreview();
+        });
+    });
+};
+
+/**
+ * 压缩图片到合理尺寸，转为 base64 JPEG
+ */
+WordCollectionApp.prototype.examCompressImage = function(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxSize = 1600;
+                let width = img.width;
+                let height = img.height;
+                if (width > maxSize || height > maxSize) {
+                    const ratio = Math.min(maxSize / width, maxSize / height);
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.85));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
+/**
+ * 渲染图片预览网格
+ */
+WordCollectionApp.prototype.renderExamPreview = function() {
+    const section = document.getElementById('exam-preview-section');
+    const grid = document.getElementById('exam-preview-grid');
+
+    if (this.examImages.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+
+    section.classList.remove('hidden');
+    grid.innerHTML = this.examImages.map((img, i) => `
+        <div class="exam-preview-item">
+            <img src="${img}" alt="试卷图片${i + 1}">
+            <button class="exam-preview-remove" onclick="app.examRemoveImage(${i})">&times;</button>
+            <span class="exam-preview-label">第 ${i + 1} 张</span>
+        </div>
+    `).join('');
+};
+
+/**
+ * 删除单张图片
+ */
+WordCollectionApp.prototype.examRemoveImage = function(index) {
+    this.examImages.splice(index, 1);
+    this.renderExamPreview();
+};
+
+/**
+ * 清空所有图片
+ */
+WordCollectionApp.prototype.examClearImages = function() {
+    this.examImages = [];
+    this.renderExamPreview();
+};
+
+/**
+ * 打开相机
+ */
+WordCollectionApp.prototype.examOpenCamera = async function() {
+    try {
+        this.examCameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        });
+        const video = document.getElementById('exam-camera-video');
+        video.srcObject = this.examCameraStream;
+        document.getElementById('exam-camera-area').classList.remove('hidden');
+    } catch (err) {
+        this.showExamToast('无法访问相机，请检查权限或使用上传功能');
+    }
+};
+
+/**
+ * 关闭相机
+ */
+WordCollectionApp.prototype.examCloseCamera = function() {
+    if (this.examCameraStream) {
+        this.examCameraStream.getTracks().forEach(t => t.stop());
+        this.examCameraStream = null;
+    }
+    document.getElementById('exam-camera-area').classList.add('hidden');
+};
+
+/**
+ * 拍照
+ */
+WordCollectionApp.prototype.examSnap = function() {
+    const video = document.getElementById('exam-camera-video');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    // 压缩
+    const maxSize = 1600;
+    let width = canvas.width;
+    let height = canvas.height;
+    if (width > maxSize || height > maxSize) {
+        const ratio = Math.min(maxSize / width, maxSize / height);
+        const resized = document.createElement('canvas');
+        resized.width = Math.round(width * ratio);
+        resized.height = Math.round(height * ratio);
+        resized.getContext('2d').drawImage(canvas, 0, 0, resized.width, resized.height);
+        this.examImages.push(resized.toDataURL('image/jpeg', 0.85));
+    } else {
+        this.examImages.push(canvas.toDataURL('image/jpeg', 0.85));
+    }
+
+    this.renderExamPreview();
+    this.examCloseCamera();
+    this.showExamToast('拍照成功！已添加到预览');
+};
+
+/**
+ * 显示轻提示
+ */
+WordCollectionApp.prototype.showExamToast = function(msg) {
+    let toast = document.getElementById('exam-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'exam-toast';
+        toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 24px;border-radius:8px;z-index:9999;font-size:14px;transition:opacity 0.3s;opacity:0;';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.opacity = '1';
+    clearTimeout(this._examToastTimer);
+    this._examToastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+};
+
+/**
+ * 开始智能分析
+ */
+WordCollectionApp.prototype.examStartAnalysis = async function() {
+    if (this.examImages.length === 0) {
+        this.showExamToast('请先上传至少一张试卷图片');
+        return;
+    }
+
+    // 切换到分析中状态
+    document.getElementById('exam-upload-section').classList.add('hidden');
+    document.getElementById('exam-preview-section').classList.add('hidden');
+    document.getElementById('exam-analyzing').classList.remove('hidden');
+    document.getElementById('exam-result-section').classList.add('hidden');
+
+    // 动态提示文字
+    const analyzeText = document.getElementById('exam-analyzing-text');
+    const steps = ['正在识别试卷内容...', '正在提取题目信息...', '正在分析错误和知识点...', '正在生成学习建议...'];
+    let stepIdx = 0;
+    analyzeText.textContent = steps[0];
+    const stepInterval = setInterval(() => {
+        stepIdx++;
+        if (stepIdx < steps.length) {
+            analyzeText.textContent = steps[stepIdx];
+        }
+    }, 2500);
+
+    try {
+        const result = await this.callExamAnalysisAPI();
+        clearInterval(stepInterval);
+        this.renderExamResult(result);
+    } catch (err) {
+        clearInterval(stepInterval);
+        console.error('试卷AI分析失败:', err);
+        // 使用模拟数据作为兜底
+        const mockResult = this.generateMockExamResult();
+        this.renderExamResult(mockResult);
+        this.showExamToast('AI分析服务暂不可用，已展示示例分析结果');
+    }
+};
+
+/**
+ * 调用 DashScope 多模态 API 分析试卷
+ * 使用 qwen-vl-plus 视觉语言模型
+ */
+WordCollectionApp.prototype.callExamAnalysisAPI = async function() {
+    const apiKey = this.settings.apiKey;
+    if (!apiKey) {
+        throw new Error('未设置API Key');
+    }
+
+    // 构建多模态消息内容
+    const content = [];
+    this.examImages.forEach(img => {
+        content.push({ image: img });
+    });
+
+    const prompt = `你是一个专业的英语试卷分析助手。请仔细分析上传的试卷图片，识别试卷中的题目、答案和得分情况。
+
+请从以下维度进行分析，并以JSON格式返回结果：
+
+{
+  "overview": {
+    "level": "整体水平评价（如：优秀/良好/中等/需提升）",
+    "score": "预估得分率或分数，如：72%",
+    "description": "整体表现描述（1-2句话）"
+  },
+  "questionTypes": [
+    {"name": "题型名称", "count": 题目数量, "correct": 正确数, "wrong": 错误数}
+  ],
+  "errorAnalysis": [
+    {"type": "错误类型", "count": 数量, "examples": ["错误示例1", "错误示例2"], "tags": ["标签1"]}
+  ],
+  "knowledgePoints": [
+    {"name": "知识点名称", "mastery": 掌握度百分比0-100, "total": 总题数, "correct": 正确数}
+  ],
+  "weakPoints": [
+    {"point": "薄弱知识点", "reason": "原因分析", "suggestion": "改进建议"}
+  ],
+  "advice": ["具体建议1", "具体建议2", "具体建议3"],
+  "actionPlan": [
+    {"title": "行动项标题", "description": "详细描述", "icon": "emoji图标", "target": "对应模块"}
+  ]
+}
+
+要求：
+1. questionTypes 包括：选择题、填空题、阅读理解、完形填空、翻译、作文等
+2. errorAnalysis 的 type 包括：词汇不足、语法错误、理解偏差、拼写错误、时态错误、固定搭配等
+3. knowledgePoints 的 mastery 用0-100的整数
+4. actionPlan 的 target 可选值：practice（单词练习）、reading（阅读练习）、cloze（选词填空）、translation（翻译练习）、writing（写作练习）、collection（收藏室）
+5. advice 给出3-5条具体可执行的建议
+6. 如果图片不清晰，请根据可见内容尽力分析`;
+
+    content.push({ text: prompt });
+
+    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: 'qwen-vl-plus',
+            input: {
+                messages: [
+                    { role: 'user', content: content }
+                ]
+            }
+        })
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`API请求失败: ${response.status} ${errText}`);
+    }
+
+    const data = await response.json();
+    const responseText = data.output?.choices?.[0]?.message?.content ||
+                         data.output?.text || '';
+
+    // 从返回文本中提取JSON
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+        try {
+            return JSON.parse(jsonMatch[0]);
+        } catch (e) {
+            // JSON解析失败，尝试清理后重试
+            const cleaned = jsonMatch[0].replace(/[\x00-\x1f]/g, '').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+            return JSON.parse(cleaned);
+        }
+    }
+
+    throw new Error('无法解析AI返回结果');
+};
+
+/**
+ * 渲染分析结果
+ */
+WordCollectionApp.prototype.renderExamResult = function(result) {
+    document.getElementById('exam-analyzing').classList.add('hidden');
+    document.getElementById('exam-result-section').classList.remove('hidden');
+
+    // 总览
+    const overview = result.overview || {};
+    const level = overview.level || '分析完成';
+    const icon = level.includes('优秀') ? '🌟' :
+                 level.includes('良好') ? '✨' :
+                 level.includes('中等') ? '📊' :
+                 level.includes('需提升') ? '📈' : '📋';
+    document.getElementById('exam-overview-icon').textContent = icon;
+    document.getElementById('exam-overview-level').textContent =
+        `${level}${overview.score ? ' · ' + overview.score : ''}`;
+    document.getElementById('exam-overview-desc').textContent = overview.description || '';
+
+    // 各维度渲染
+    this.renderExamQuestionTypes(result.questionTypes || []);
+    this.renderExamErrorAnalysis(result.errorAnalysis || []);
+    this.renderExamKnowledgePoints(result.knowledgePoints || []);
+    this.renderExamWeakPoints(result.weakPoints || []);
+    this.renderExamAdvice(result.advice || []);
+    this.renderExamActionPlan(result.actionPlan || []);
+};
+
+/**
+ * 渲染题型分布
+ */
+WordCollectionApp.prototype.renderExamQuestionTypes = function(types) {
+    const container = document.getElementById('exam-question-types');
+    if (types.length === 0) {
+        container.innerHTML = '<p class="exam-empty">暂无题型数据</p>';
+        return;
+    }
+
+    const maxCount = Math.max(...types.map(t => t.count || 0), 1);
+    container.innerHTML = types.map(t => {
+        const total = (t.count || 0);
+        const correct = t.correct || 0;
+        const wrong = t.wrong || 0;
+        const correctPct = total > 0 ? (correct / total * 100) : 0;
+        const wrongPct = total > 0 ? (wrong / total * 100) : 0;
+        const barWidth = (total / maxCount * 100);
+        return `
+            <div class="exam-type-row">
+                <span class="exam-type-name">${t.name || '未知题型'}</span>
+                <div class="exam-type-bar">
+                    <div class="exam-type-fill" style="width:${barWidth}%;">
+                        <div class="exam-type-correct" style="width:${correctPct}%"></div>
+                    </div>
+                </div>
+                <span class="exam-type-count">${correct}/${total}</span>
+            </div>
+        `;
+    }).join('');
+};
+
+/**
+ * 渲染错误分析
+ */
+WordCollectionApp.prototype.renderExamErrorAnalysis = function(errors) {
+    const container = document.getElementById('exam-error-analysis');
+    if (errors.length === 0) {
+        container.innerHTML = '<p class="exam-empty">暂无错误数据</p>';
+        return;
+    }
+
+    container.innerHTML = errors.map(err => {
+        const tags = (err.tags || []).map(t => `<span class="exam-error-tag">${t}</span>`).join('');
+        const examples = (err.examples || []).map(ex => `<div class="exam-weak-item"><span class="exam-weak-dot"></span><span class="exam-weak-text">${ex}</span></div>`).join('');
+        return `
+            <div class="exam-error-block" style="margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <span style="font-weight:600;font-size:14px;">${err.type || '未知错误'}</span>
+                    <span style="font-size:13px;color:var(--text-muted);">${err.count || 0} 处</span>
+                </div>
+                ${tags ? `<div style="margin-bottom:6px;">${tags}</div>` : ''}
+                ${examples}
+            </div>
+        `;
+    }).join('');
+};
+
+/**
+ * 渲染知识点掌握度
+ */
+WordCollectionApp.prototype.renderExamKnowledgePoints = function(points) {
+    const container = document.getElementById('exam-knowledge-points');
+    if (points.length === 0) {
+        container.innerHTML = '<p class="exam-empty">暂无知识点数据</p>';
+        return;
+    }
+
+    container.innerHTML = points.map(p => {
+        const mastery = p.mastery || 0;
+        const color = mastery >= 80 ? 'var(--success, #4caf50)' :
+                      mastery >= 60 ? 'var(--warning, #ff9800)' :
+                      'var(--danger, #f44336)';
+        return `
+            <div class="exam-knowledge-row">
+                <span class="exam-knowledge-name">${p.name || '未知知识点'}</span>
+                <div class="exam-knowledge-bar">
+                    <div class="exam-knowledge-fill" style="width:${mastery}%;background:${color};"></div>
+                </div>
+                <span class="exam-knowledge-pct">${mastery}%</span>
+            </div>
+        `;
+    }).join('');
+};
+
+/**
+ * 渲染薄弱环节
+ */
+WordCollectionApp.prototype.renderExamWeakPoints = function(weakPoints) {
+    const container = document.getElementById('exam-weak-points');
+    if (weakPoints.length === 0) {
+        container.innerHTML = '<p class="exam-empty">暂未发现明显薄弱环节</p>';
+        return;
+    }
+
+    container.innerHTML = weakPoints.map(wp => `
+        <div class="exam-weak-item">
+            <span class="exam-weak-dot" style="background:#f44336;"></span>
+            <div>
+                <div class="exam-weak-text" style="font-weight:600;">${wp.point || ''}</div>
+                <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">${wp.reason || ''}</div>
+                <div style="font-size:13px;color:var(--accent);margin-top:2px;">💡 ${wp.suggestion || ''}</div>
+            </div>
+        </div>
+    `).join('');
+};
+
+/**
+ * 渲染AI建议
+ */
+WordCollectionApp.prototype.renderExamAdvice = function(advice) {
+    const container = document.getElementById('exam-advice-body');
+    if (advice.length === 0) {
+        container.innerHTML = '<p class="exam-empty">暂无建议</p>';
+        return;
+    }
+
+    container.innerHTML = advice.map((a, i) => `
+        <div class="exam-advice-item">
+            <span class="exam-advice-num">${i + 1}</span>
+            <span class="exam-advice-text">${a}</span>
+        </div>
+    `).join('');
+};
+
+/**
+ * 渲染行动计划
+ */
+WordCollectionApp.prototype.renderExamActionPlan = function(actions) {
+    const container = document.getElementById('exam-action-body');
+    if (actions.length === 0) {
+        container.innerHTML = '<p class="exam-empty">暂无行动计划</p>';
+        return;
+    }
+
+    container.innerHTML = actions.map(a => `
+        <div class="exam-action-item" onclick="app.examGotoModule('${a.target || 'practice'}')">
+            <span class="exam-action-icon">${a.icon || '🎯'}</span>
+            <div class="exam-action-info">
+                <div class="exam-action-title">${a.title || ''}</div>
+                <div class="exam-action-desc">${a.description || ''}</div>
+            </div>
+        </div>
+    `).join('');
+};
+
+/**
+ * 跳转到对应学习模块
+ */
+WordCollectionApp.prototype.examGotoModule = function(target) {
+    const pageMap = {
+        practice: 'practice',
+        reading: 'reading',
+        cloze: 'cloze',
+        translation: 'translation',
+        writing: 'writing',
+        collection: 'collection'
+    };
+    const page = pageMap[target] || 'practice';
+    this.switchPage(page);
+};
+
+/**
+ * 重新分析
+ */
+WordCollectionApp.prototype.examRetry = function() {
+    document.getElementById('exam-result-section').classList.add('hidden');
+    document.getElementById('exam-upload-section').classList.remove('hidden');
+    if (this.examImages.length > 0) {
+        document.getElementById('exam-preview-section').classList.remove('hidden');
+    }
+};
+
+/**
+ * 生成模拟分析结果（当API不可用时作为兜底）
+ */
+WordCollectionApp.prototype.generateMockExamResult = function() {
+    return {
+        overview: {
+            level: '中等',
+            score: '约 68%',
+            description: '基础题掌握较好，但在阅读理解和语法应用方面存在不足，建议针对性强化训练。'
+        },
+        questionTypes: [
+            { name: '选择题', count: 20, correct: 15, wrong: 5 },
+            { name: '完形填空', count: 10, correct: 6, wrong: 4 },
+            { name: '阅读理解', count: 15, correct: 8, wrong: 7 },
+            { name: '翻译', count: 5, correct: 3, wrong: 2 },
+            { name: '作文', count: 1, correct: 0, wrong: 1 }
+        ],
+        errorAnalysis: [
+            {
+                type: '词汇不足',
+                count: 8,
+                examples: ['将 "abandon" 误选为 "abundant"', '将 "affect" 与 "effect" 混淆'],
+                tags: ['形近词', '词义辨析']
+            },
+            {
+                type: '语法错误',
+                count: 5,
+                examples: ['时态使用错误：将过去完成时误用为一般过去时', '主谓不一致'],
+                tags: ['时态', '主谓一致']
+            },
+            {
+                type: '理解偏差',
+                count: 4,
+                examples: ['推理题误选表面信息选项', '主旨题偏离文章核心观点'],
+                tags: ['推理', '主旨']
+            }
+        ],
+        knowledgePoints: [
+            { name: '基础词汇', mastery: 75, total: 20, correct: 15 },
+            { name: '语法结构', mastery: 55, total: 10, correct: 5 },
+            { name: '阅读理解', mastery: 53, total: 15, correct: 8 },
+            { name: '翻译能力', mastery: 60, total: 5, correct: 3 },
+            { name: '写作表达', mastery: 45, total: 1, correct: 0 }
+        ],
+        weakPoints: [
+            {
+                point: '阅读理解推理题',
+                reason: '对文章隐含含义的理解不够深入，容易被干扰选项迷惑',
+                suggestion: '多做推理类阅读练习，训练从上下文推断作者意图的能力'
+            },
+            {
+                point: '时态与语态',
+                reason: '过去完成时、现在完成进行时等复杂时态使用不熟练',
+                suggestion: '系统复习时态用法，结合例句对比记忆'
+            },
+            {
+                point: '作文结构',
+                reason: '文章逻辑衔接不够紧密，句式较为单一',
+                suggestion: '学习使用连接词和复合句型，多读优秀范文'
+            }
+        ],
+        advice: [
+            '每天坚持背诵20个考研高频词汇，重点关注形近词和易混词的辨析',
+            '每周完成3篇阅读理解练习，重点训练推理题和主旨题的解题技巧',
+            '系统复习英语时态和语态，制作时态对比表格加深记忆',
+            '每周写1篇作文，学习使用过渡词和复合句型提升文章质量',
+            '将本次错题整理到错题本，定期回顾避免重复犯错'
+        ],
+        actionPlan: [
+            { title: '强化词汇记忆', description: '前往单词练习模块，针对形近词和易混词进行专项训练', icon: '📖', target: 'practice' },
+            { title: '阅读理解特训', description: '前往阅读练习模块，选择中等难度文章进行推理题专项练习', icon: '📚', target: 'reading' },
+            { title: '选词填空练习', description: '前往选词填空模块，训练语境理解和词汇应用能力', icon: '✏️', target: 'cloze' },
+            { title: '翻译能力提升', description: '前往翻译练习模块，练习中英互译并获取AI评判反馈', icon: '🔄', target: 'translation' },
+            { title: '写作专项训练', description: '前往写作练习模块，练习不同类型作文并获取AI评分', icon: '✍️', target: 'writing' }
+        ]
+    };
+};
 
 // ===== 初始化应用 =====
 document.addEventListener('DOMContentLoaded', () => {
