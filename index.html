@@ -47,6 +47,9 @@
             <button class="nav-tab" data-page="exam">
                 <span>📋</span> 试卷分析
             </button>
+            <button class="nav-tab" data-page="report">
+                <span>📑</span> 学习报告
+            </button>
         </div>
         <div class="nav-info">
             <span class="total-words">📚 0 个单词</span>
@@ -1200,6 +1203,111 @@
                 </div>
             </div>
         </section>
+
+        <!-- 学习报告页 -->
+        <section id="report-page" class="page">
+            <div class="report-container">
+                <div class="report-header">
+                    <h1>📑 学习诊断报告</h1>
+                    <p class="subtitle">综合错题记录与试卷分析，生成个性化学习诊断报告和错题集</p>
+                    <div class="report-actions">
+                        <button class="btn-report-generate" id="btn-report-generate">🔍 生成报告</button>
+                        <button class="btn-report-export" id="btn-report-export">📥 导出错题集</button>
+                    </div>
+                </div>
+
+                <!-- 报告内容区 -->
+                <div class="report-content hidden" id="report-content">
+                    <!-- 综合诊断总览 -->
+                    <div class="report-overview-card" id="report-overview-card">
+                        <div class="report-overview-left">
+                            <div class="report-overview-grade" id="report-overview-grade">--</div>
+                            <div class="report-overview-score" id="report-overview-score">--</div>
+                        </div>
+                        <div class="report-overview-right">
+                            <div class="report-overview-title" id="report-overview-title">综合学习诊断</div>
+                            <div class="report-overview-desc" id="report-overview-desc"></div>
+                        </div>
+                    </div>
+
+                    <!-- 数据来源说明 -->
+                    <div class="report-source-bar" id="report-source-bar"></div>
+
+                    <!-- 多维度雷达 -->
+                    <div class="report-section">
+                        <div class="report-section-title">
+                            <span class="report-section-icon">🎯</span>
+                            <span>能力维度评估</span>
+                        </div>
+                        <div class="report-radar-wrap">
+                            <canvas id="report-radar-canvas" width="400" height="320"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 错题统计与分类 -->
+                    <div class="report-section">
+                        <div class="report-section-title">
+                            <span class="report-section-icon">📊</span>
+                            <span>错题统计与分类</span>
+                        </div>
+                        <div class="report-error-summary" id="report-error-summary"></div>
+                    </div>
+
+                    <!-- 高频错题集 -->
+                    <div class="report-section">
+                        <div class="report-section-title">
+                            <span class="report-section-icon">📌</span>
+                            <span>高频错题集</span>
+                            <button class="report-tab-btn active" data-report-tab="frequent">高频错题</button>
+                            <button class="report-tab-btn" data-report-tab="recent">最近错题</button>
+                            <button class="report-tab-btn" data-report-tab="exam">试卷错题</button>
+                        </div>
+                        <div class="report-error-list" id="report-error-list"></div>
+                    </div>
+
+                    <!-- 错误模式分析 -->
+                    <div class="report-section">
+                        <div class="report-section-title">
+                            <span class="report-section-icon">🔍</span>
+                            <span>错误模式分析</span>
+                        </div>
+                        <div class="report-pattern-list" id="report-pattern-list"></div>
+                    </div>
+
+                    <!-- 改进方向 -->
+                    <div class="report-section">
+                        <div class="report-section-title">
+                            <span class="report-section-icon">🚀</span>
+                            <span>改进方向与行动计划</span>
+                        </div>
+                        <div class="report-improvement-list" id="report-improvement-list"></div>
+                    </div>
+
+                    <!-- AI 学习建议 -->
+                    <div class="report-section">
+                        <div class="report-section-title">
+                            <span class="report-section-icon">💡</span>
+                            <span>AI 个性化建议</span>
+                            <button class="btn-report-ai" id="btn-report-ai">✨ AI深度分析</button>
+                        </div>
+                        <div class="report-ai-advice" id="report-ai-advice">
+                            <p class="report-empty">点击「AI深度分析」获取个性化建议</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 空状态 -->
+                <div class="report-empty-state" id="report-empty-state">
+                    <div class="report-empty-icon">📑</div>
+                    <p class="report-empty-title">暂无学习诊断数据</p>
+                    <p class="report-empty-desc">完成练习或上传试卷分析后，点击「生成报告」即可获得个性化学习诊断</p>
+                    <div class="report-empty-actions">
+                        <button class="btn-empty-goto" onclick="app.switchPage('practice')">去练习</button>
+                        <button class="btn-empty-goto" onclick="app.switchPage('exam')">去上传试卷</button>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- 设置弹窗 -->
@@ -1337,7 +1445,7 @@
     <script src="backend/api-client.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="agent-frontend.js"></script>
-    <script src="app.js?v=33"></script>
+    <script src="app.js?v=34"></script>
     <script>
         // Force fresh data on new word database
         if (typeof EMBEDDED_WORDS !== 'undefined') {

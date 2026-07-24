@@ -1548,6 +1548,8 @@ class WordCollectionApp {
             this.renderWrongList();
         } else if (page === 'exam') {
             this.initExamPage();
+        } else if (page === 'report') {
+            this.initReportPage();
         }
     }
     
@@ -10374,6 +10376,9 @@ WordCollectionApp.prototype.renderExamResult = function(result) {
     document.getElementById('exam-analyzing').classList.add('hidden');
     document.getElementById('exam-result-section').classList.remove('hidden');
 
+    // 保存分析结果供报告模块使用
+    this.saveExamResult(result);
+
     // 总览
     const overview = result.overview || {};
     const level = overview.level || '分析完成';
@@ -10644,6 +10649,909 @@ WordCollectionApp.prototype.generateMockExamResult = function() {
             { title: '写作专项训练', description: '前往写作练习模块，练习不同类型作文并获取AI评分', icon: '✍️', target: 'writing' }
         ]
     };
+};
+
+// ===== 学习诊断报告模块 =====
+
+/**
+ * 初始化学习报告页面
+ */
+WordCollectionApp.prototype.initReportPage = function() {
+    if (this.reportPageInitialized) {
+        // 已初始化过，仅刷新数据
+        this.checkReportData();
+        return;
+    }
+    this.reportPageInitialized = true;
+    this.reportCurrentTab = 'frequent';
+    this.reportData = null;
+
+    document.getElementById('btn-report-generate').addEventListener('click', () => this.generateReport());
+    document.getElementById('btn-report-export').addEventListener('click', () => this.exportErrorCollection());
+    document.getElementById('btn-report-ai').addEventListener('click', () => this.reportAIDeepAnalysis());
+
+    // Tab切换
+    document.querySelectorAll('.report-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.report-tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            this.reportCurrentTab = e.target.dataset.reportTab;
+            this.renderReportErrorList();
+        });
+    });
+
+    this.checkReportData();
+};
+
+/**
+ * 检查是否有数据可生成报告
+ */
+WordCollectionApp.prototype.checkReportData = function() {
+    const wrongCount = this.wrongRecords.length;
+    const moduleStats = Storage.getModuleStats();
+    const hasExamResult = !!this.getLastExamResult();
+    const hasActivity = wrongCount > 0 || moduleStats.reading.total > 0 ||
+                        (moduleStats.translation && moduleStats.translation.total > 0) ||
+                        (moduleStats.cloze && moduleStats.cloze.total > 0);
+
+    if (hasActivity || hasExamResult) {
+        document.getElementById('report-empty-state').classList.add('hidden');
+        document.getElementById('report-content').classList.remove('hidden');
+        this.generateReport();
+    } else {
+        document.getElementById('report-empty-state').classList.remove('hidden');
+        document.getElementById('report-content').classList.add('hidden');
+    }
+};
+
+/**
+ * 获取上次试卷分析结果
+ */
+WordCollectionApp.prototype.getLastExamResult = function() {
+    const data = localStorage.getItem('ciguang_exam_result');
+    return data ? JSON.parse(data) : null;
+};
+
+/**
+ * 保存试卷分析结果
+ */
+WordCollectionApp.prototype.saveExamResult = function(result) {
+    localStorage.setItem('ciguang_exam_result', JSON.stringify({
+        ...result,
+        savedAt: new Date().toISOString()
+    }));
+};
+
+/**
+ * 生成学习诊断报告
+ */
+WordCollectionApp.prototype.generateReport = function() {
+    const wrongRecords = this.wrongRecords;
+    const moduleStats = Storage.getModuleStats();
+    const examResult = this.getLastExamResult();
+
+    // 检查数据
+    const sources = [];
+    if (wrongRecords.length > 0) sources.push('错题记录');
+    if (moduleStats.reading.total > 0 || (moduleStats.cloze && moduleStats.cloze.total > 0) ||
+        (moduleStats.translation && moduleStats.translation.total > 0)) sources.push('练习统计');
+    if (examResult) sources.push('试卷分析');
+
+    if (sources.length === 0) {
+        this.showExamToast('暂无学习数据，请先完成练习或上传试卷');
+        return;
+    }
+
+    // 构建报告数据
+    const report = this.buildReportData(wrongRecords, moduleStats, examResult);
+    this.reportData = report;
+
+    // 渲染各部分
+    this.renderReportOverview(report, sources);
+    this.renderReportRadar(report);
+    this.renderReportErrorSummary(report);
+    this.renderReportErrorList();
+    this.renderReportPatterns(report);
+    this.renderReportImprovement(report);
+
+    document.getElementById('report-content').classList.remove('hidden');
+    document.getElementById('report-empty-state').classList.add('hidden');
+};
+
+/**
+ * 构建报告数据
+ */
+WordCollectionApp.prototype.buildReportData = function(wrongRecords, moduleStats, examResult) {
+    // 错题分类统计
+    const typeStats = {};
+    wrongRecords.forEach(r => {
+        const type = r.type || 'other';
+        if (!typeStats[type]) typeStats[type] = { count: 0, words: [] };
+        typeStats[type].count++;
+        if (r.word) typeStats[type].words.push(r.word);
+    });
+
+    // 高频错题（按单词出现次数）
+    const wordFreq = {};
+    wrongRecords.forEach(r => {
+        const w = r.word || '';
+        if (w) {
+            if (!wordFreq[w]) wordFreq[w] = { count: 0, records: [] };
+            wordFreq[w].count++;
+            wordFreq[w].records.push(r);
+        }
+    });
+    const frequentErrors = Object.entries(wordFreq)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([word, data]) => ({ word, ...data }));
+
+    // 最近错题
+    const recentErrors = [...wrongRecords]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 10);
+
+    // 试卷错题
+    const examErrors = [];
+    if (examResult && examResult.errorAnalysis) {
+        examResult.errorAnalysis.forEach(err => {
+            (err.examples || []).forEach(ex => {
+                examErrors.push({
+                    word: ex,
+                    type: 'exam',
+                    meaning: err.type,
+                    question: err.tags ? err.tags.join(', ') : '',
+                    createdAt: examResult.savedAt
+                });
+            });
+        });
+    }
+
+    // 能力维度评分（0-100）
+    const dimensions = this.calculateAbilityDimensions(wrongRecords, moduleStats, examResult);
+
+    // 综合评分
+    const overallScore = Math.round(
+        Object.values(dimensions).reduce((sum, v) => sum + v, 0) / Object.keys(dimensions).length
+    );
+
+    // 错误模式
+    const patterns = this.analyzeReportErrorPatterns(typeStats, wrongRecords, examResult);
+
+    // 改进方向
+    const improvements = this.generateImprovements(dimensions, patterns, examResult);
+
+    return {
+        overallScore,
+        dimensions,
+        typeStats,
+        frequentErrors,
+        recentErrors,
+        examErrors,
+        patterns,
+        improvements,
+        examResult,
+        wrongCount: wrongRecords.length,
+        moduleStats
+    };
+};
+
+/**
+ * 计算能力维度评分
+ */
+WordCollectionApp.prototype.calculateAbilityDimensions = function(wrongRecords, moduleStats, examResult) {
+    // 基础词汇：从练习正确率推算
+    let vocabScore = 50;
+    if (moduleStats.practice && moduleStats.practice.total > 0) {
+        vocabScore = Math.round((moduleStats.practice.correct / moduleStats.practice.total) * 100);
+    }
+    // 从试卷分析补充
+    if (examResult && examResult.knowledgePoints) {
+        const vocabKP = examResult.knowledgePoints.find(k => k.name.includes('词汇'));
+        if (vocabKP) vocabScore = Math.round((vocabScore + vocabKP.mastery) / 2);
+    }
+    // 错题惩罚
+    const vocabErrors = wrongRecords.filter(r => r.type === 'practice' || r.type === 'memory').length;
+    vocabScore = Math.max(10, vocabScore - vocabErrors * 2);
+
+    // 语法结构
+    let grammarScore = 50;
+    if (examResult && examResult.knowledgePoints) {
+        const grammarKP = examResult.knowledgePoints.find(k => k.name.includes('语法'));
+        if (grammarKP) grammarScore = grammarKP.mastery;
+    }
+
+    // 阅读理解
+    let readingScore = 0;
+    if (moduleStats.reading && moduleStats.reading.total > 0) {
+        readingScore = Math.round((moduleStats.reading.correct / moduleStats.reading.total) * 100);
+    }
+    if (examResult && examResult.knowledgePoints) {
+        const readingKP = examResult.knowledgePoints.find(k => k.name.includes('阅读'));
+        if (readingKP) readingScore = Math.round((readingScore + readingKP.mastery) / 2);
+    }
+    if (readingScore === 0) readingScore = 40;
+
+    // 翻译能力
+    let translationScore = moduleStats.translation?.avgScore || 40;
+    if (examResult && examResult.knowledgePoints) {
+        const transKP = examResult.knowledgePoints.find(k => k.name.includes('翻译'));
+        if (transKP) translationScore = Math.round((translationScore + transKP.mastery) / 2);
+    }
+
+    // 选词填空
+    let clozeScore = 40;
+    if (moduleStats.cloze && moduleStats.cloze.total > 0) {
+        clozeScore = Math.round((moduleStats.cloze.correct / moduleStats.cloze.total) * 100);
+    }
+    if (examResult && examResult.knowledgePoints) {
+        const clozeKP = examResult.knowledgePoints.find(k => k.name.includes('填空') || k.name.includes('完形'));
+        if (clozeKP) clozeScore = Math.round((clozeScore + clozeKP.mastery) / 2);
+    }
+
+    // 写作表达
+    let writingScore = 40;
+    if (examResult && examResult.knowledgePoints) {
+        const writingKP = examResult.knowledgePoints.find(k => k.name.includes('写作') || k.name.includes('作文'));
+        if (writingKP) writingScore = writingKP.mastery;
+    }
+
+    return {
+        '词汇掌握': vocabScore,
+        '语法结构': grammarScore,
+        '阅读理解': readingScore,
+        '翻译能力': translationScore,
+        '选词填空': clozeScore,
+        '写作表达': writingScore
+    };
+};
+
+/**
+ * 分析错误模式（报告专用）
+ */
+WordCollectionApp.prototype.analyzeReportErrorPatterns = function(typeStats, wrongRecords, examResult) {
+    const patterns = [];
+
+    // 从错题类型统计
+    const typeMap = {
+        practice: { name: '单词释义错误', desc: '对单词含义理解不准确或记忆模糊' },
+        reading: { name: '阅读理解错误', desc: '文章理解偏差或推理能力不足' },
+        cloze: { name: '选词填空错误', desc: '语境理解或词汇应用能力薄弱' },
+        memory: { name: '记忆巩固不足', desc: '已学单词遗忘，需加强复习' }
+    };
+
+    Object.entries(typeStats || {}).forEach(([type, data]) => {
+        const info = typeMap[type] || { name: type, desc: '' };
+        patterns.push({
+            name: info.name,
+            count: data.count,
+            desc: info.desc,
+            pct: wrongRecords.length > 0 ? Math.round(data.count / wrongRecords.length * 100) : 0
+        });
+    });
+
+    // 从试卷分析补充
+    if (examResult && examResult.errorAnalysis) {
+        examResult.errorAnalysis.forEach(err => {
+            const existing = patterns.find(p => p.name === err.type);
+            if (existing) {
+                existing.count += err.count || 0;
+            } else {
+                patterns.push({
+                    name: err.type,
+                    count: err.count || 0,
+                    desc: (err.examples || []).join('；'),
+                    pct: 0
+                });
+            }
+        });
+    }
+
+    // 排序并计算百分比
+    patterns.sort((a, b) => b.count - a.count);
+    const total = patterns.reduce((sum, p) => sum + p.count, 0);
+    patterns.forEach(p => {
+        if (total > 0) p.pct = Math.round(p.count / total * 100);
+    });
+
+    return patterns.slice(0, 6);
+};
+
+/**
+ * 生成改进方向
+ */
+WordCollectionApp.prototype.generateImprovements = function(dimensions, patterns, examResult) {
+    const improvements = [];
+
+    // 找出最薄弱维度
+    const sortedDims = Object.entries(dimensions).sort((a, b) => a[1] - b[1]);
+    const weakest = sortedDims[0];
+    const secondWeakest = sortedDims[1];
+
+    const dimActions = {
+        '词汇掌握': { target: 'practice', action: '单词练习' },
+        '语法结构': { target: 'reading', action: '阅读练习' },
+        '阅读理解': { target: 'reading', action: '阅读练习' },
+        '翻译能力': { target: 'translation', action: '翻译练习' },
+        '选词填空': { target: 'cloze', action: '选词填空' },
+        '写作表达': { target: 'writing', action: '写作练习' }
+    };
+
+    if (weakest) {
+        const [dim, score] = weakest;
+        const action = dimActions[dim];
+        improvements.push({
+            title: `优先强化：${dim}（当前 ${score}分）`,
+            desc: `${dim}是你最薄弱的环节，建议每天投入20分钟进行${action.action}，从基础题目开始逐步提升难度。`,
+            actions: [{ label: `去${action.action}`, target: action.target }]
+        });
+    }
+
+    if (secondWeakest && secondWeakest[1] < 60) {
+        const [dim, score] = secondWeakest;
+        const action = dimActions[dim];
+        improvements.push({
+            title: `同步提升：${dim}（当前 ${score}分）`,
+            desc: `${dim}也需要关注，建议每周安排3次${action.action}，巩固薄弱知识点。`,
+            actions: [{ label: `去${action.action}`, target: action.target }]
+        });
+    }
+
+    // 高频错题改进
+    if (patterns.length > 0 && patterns[0].count >= 3) {
+        improvements.push({
+            title: `攻克高频错误：${patterns[0].name}`,
+            desc: `${patterns[0].name}出现${patterns[0].count}次，占比${patterns[0].pct}%。建议整理相关错题，集中攻克这类问题。`,
+            actions: [{ label: '查看错题本', target: 'wrong' }]
+        });
+    }
+
+    // 从试卷分析建议
+    if (examResult && examResult.advice) {
+        examResult.advice.slice(0, 2).forEach(advice => {
+            improvements.push({
+                title: '试卷分析建议',
+                desc: advice,
+                actions: []
+            });
+        });
+    }
+
+    // 综合建议
+    const avgScore = Math.round(Object.values(dimensions).reduce((s, v) => s + v, 0) / Object.keys(dimensions).length);
+    if (avgScore < 60) {
+        improvements.push({
+            title: '制定系统学习计划',
+            desc: '综合能力尚有较大提升空间，建议制定每日学习计划：早晨背单词30分钟，下午做阅读1篇，晚上复习错题。',
+            actions: [{ label: '去练习', target: 'practice' }]
+        });
+    } else if (avgScore < 80) {
+        improvements.push({
+            title: '查漏补缺，突破瓶颈',
+            desc: '基础已较扎实，建议针对薄弱环节进行专项突破，同时保持每日练习巩固已有成果。',
+            actions: []
+        });
+    } else {
+        improvements.push({
+            title: '保持优秀，冲刺高分',
+            desc: '你的综合表现优秀！建议挑战更高难度的题目，同时关注细节避免粗心失误。',
+            actions: []
+        });
+    }
+
+    return improvements;
+};
+
+/**
+ * 渲染总览
+ */
+WordCollectionApp.prototype.renderReportOverview = function(report, sources) {
+    const score = report.overallScore;
+    let grade, title;
+    if (score >= 85) { grade = 'A+'; title = '优秀'; }
+    else if (score >= 75) { grade = 'A'; title = '良好'; }
+    else if (score >= 60) { grade = 'B'; title = '中等'; }
+    else if (score >= 40) { grade = 'C'; title = '需提升'; }
+    else { grade = 'D'; title = '薄弱'; }
+
+    document.getElementById('report-overview-grade').textContent = grade;
+    document.getElementById('report-overview-score').textContent = `${score}分`;
+    document.getElementById('report-overview-title').textContent = `综合学习诊断 · ${title}`;
+
+    // 描述
+    const dims = report.dimensions;
+    const weakest = Object.entries(dims).sort((a, b) => a[1] - b[1])[0];
+    const strongest = Object.entries(dims).sort((a, b) => b[1] - a[1])[0];
+    document.getElementById('report-overview-desc').textContent =
+        `综合得分 ${score} 分。优势：${strongest[0]}（${strongest[1]}分）；薄弱：${weakest[0]}（${weakest[1]}分）。` +
+        `共记录错题 ${report.wrongCount} 题，建议优先提升「${weakest[0]}」。`;
+
+    // 数据来源
+    const sourceBar = document.getElementById('report-source-bar');
+    sourceBar.innerHTML = sources.map(s =>
+        `<span class="report-source-tag active">${s}</span>`
+    ).join('') + `<span class="report-source-tag">报告生成于 ${new Date().toLocaleString('zh-CN')}</span>`;
+};
+
+/**
+ * 渲染雷达图
+ */
+WordCollectionApp.prototype.renderReportRadar = function(report) {
+    const canvas = document.getElementById('report-radar-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = 110;
+    const dims = Object.entries(report.dimensions);
+    const n = dims.length;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 获取CSS变量颜色
+    const styles = getComputedStyle(document.body);
+    const accentColor = styles.getPropertyValue('--accent').trim() || '#3b82f6';
+    const borderColor = styles.getPropertyValue('--border-color').trim() || '#374151';
+    const textColor = styles.getPropertyValue('--text-muted').trim() || '#9ca3af';
+
+    // 绘制网格
+    for (let level = 1; level <= 5; level++) {
+        ctx.beginPath();
+        const r = (radius * level) / 5;
+        for (let i = 0; i <= n; i++) {
+            const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+            const x = cx + Math.cos(angle) * r;
+            const y = cy + Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+
+    // 绘制轴线
+    for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+
+    // 绘制数据区域
+    ctx.beginPath();
+    dims.forEach(([name, value], i) => {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+        const r = (radius * value) / 100;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = accentColor + '33';
+    ctx.fill();
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 绘制数据点
+    dims.forEach(([name, value], i) => {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+        const r = (radius * value) / 100;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = accentColor;
+        ctx.fill();
+    });
+
+    // 绘制标签
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    dims.forEach(([name, value], i) => {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+        const labelR = radius + 24;
+        const x = cx + Math.cos(angle) * labelR;
+        const y = cy + Math.sin(angle) * labelR;
+        ctx.fillStyle = textColor;
+        ctx.fillText(name, x, y - 8);
+        ctx.fillStyle = accentColor;
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText(`${value}`, x, y + 8);
+        ctx.font = '13px sans-serif';
+    });
+};
+
+/**
+ * 渲染错题统计
+ */
+WordCollectionApp.prototype.renderReportErrorSummary = function(report) {
+    const container = document.getElementById('report-error-summary');
+    const typeMap = {
+        practice: '例句错题',
+        reading: '阅读错题',
+        cloze: '选词错题',
+        memory: '记忆错题',
+        exam: '试卷错题'
+    };
+
+    const stats = [];
+    Object.entries(report.typeStats).forEach(([type, data]) => {
+        stats.push({ label: typeMap[type] || type, count: data.count, pct: report.wrongCount > 0 ? (data.count / report.wrongCount * 100) : 0 });
+    });
+    stats.push({ label: '错题总数', count: report.wrongCount, pct: 100 });
+
+    const maxCount = Math.max(...stats.map(s => s.count), 1);
+    container.innerHTML = stats.map(s => {
+        const colors = ['#f44336', '#ff9800', '#2196f3', '#4caf50', '#9c27b0', '#607d8b'];
+        const colorIdx = stats.indexOf(s) % colors.length;
+        const barWidth = (s.count / maxCount * 100);
+        return `
+            <div class="report-error-stat">
+                <div class="report-error-stat-num">${s.count}</div>
+                <div class="report-error-stat-label">${s.label}</div>
+                <div class="report-error-stat-bar">
+                    <div class="report-error-stat-fill" style="width:${barWidth}%;background:${colors[colorIdx]};"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+};
+
+/**
+ * 渲染错题列表
+ */
+WordCollectionApp.prototype.renderReportErrorList = function() {
+    const container = document.getElementById('report-error-list');
+    if (!this.reportData) { container.innerHTML = '<p class="report-empty">暂无数据</p>'; return; }
+
+    let list = [];
+    if (this.reportCurrentTab === 'frequent') {
+        list = this.reportData.frequentErrors;
+    } else if (this.reportCurrentTab === 'recent') {
+        list = this.reportData.recentErrors.map(r => ({
+            word: r.word,
+            count: 1,
+            records: [r],
+            type: r.type,
+            meaning: r.meaning,
+            createdAt: r.createdAt
+        }));
+    } else if (this.reportCurrentTab === 'exam') {
+        list = this.reportData.examErrors.map(e => ({
+            word: e.word,
+            count: 1,
+            records: [e],
+            type: 'exam',
+            meaning: e.meaning
+        }));
+    }
+
+    if (list.length === 0) {
+        container.innerHTML = '<p class="report-empty">暂无错题数据</p>';
+        return;
+    }
+
+    const typeMap = {
+        practice: '例句', reading: '阅读', cloze: '选词', memory: '记忆', exam: '试卷'
+    };
+
+    container.innerHTML = list.map((item, i) => {
+        const rank = i + 1;
+        const rankClass = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
+        const record = item.records ? item.records[0] : item;
+        const type = record.type || item.type;
+        const meaning = record.meaning || item.meaning || '';
+        return `
+            <div class="report-error-item">
+                <div class="report-error-rank ${rankClass}">${rank}</div>
+                <div class="report-error-body">
+                    <div class="report-error-word">${item.word}</div>
+                    <div class="report-error-meta">
+                        <span class="report-error-type">${typeMap[type] || type || '未知'}</span>
+                        ${record.createdAt ? `<span>${new Date(record.createdAt).toLocaleDateString('zh-CN')}</span>` : ''}
+                    </div>
+                    ${meaning ? `<div class="report-error-meaning">${meaning}</div>` : ''}
+                </div>
+                ${item.count > 1 ? `<div class="report-error-count">错${item.count}次</div>` : ''}
+            </div>
+        `;
+    }).join('');
+};
+
+/**
+ * 渲染错误模式
+ */
+WordCollectionApp.prototype.renderReportPatterns = function(report) {
+    const container = document.getElementById('report-pattern-list');
+    if (report.patterns.length === 0) {
+        container.innerHTML = '<p class="report-empty">暂无错误模式数据</p>';
+        return;
+    }
+
+    const colors = ['#f44336', '#ff9800', '#ff5722', '#2196f3', '#4caf50', '#9c27b0'];
+    container.innerHTML = report.patterns.map((p, i) => {
+        const color = colors[i % colors.length];
+        return `
+            <div class="report-pattern-card">
+                <div class="report-pattern-header">
+                    <span class="report-pattern-name">${p.name}</span>
+                    <span class="report-pattern-count">${p.count}次</span>
+                </div>
+                <div class="report-pattern-desc">${p.desc || ''}</div>
+                <div class="report-pattern-bar">
+                    <div class="report-pattern-fill" style="width:${p.pct}%;background:${color};"></div>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">占比 ${p.pct}%</div>
+            </div>
+        `;
+    }).join('');
+};
+
+/**
+ * 渲染改进方向
+ */
+WordCollectionApp.prototype.renderReportImprovement = function(report) {
+    const container = document.getElementById('report-improvement-list');
+    if (report.improvements.length === 0) {
+        container.innerHTML = '<p class="report-empty">暂无改进建议</p>';
+        return;
+    }
+
+    container.innerHTML = report.improvements.map((imp, i) => `
+        <div class="report-improvement-item">
+            <div class="report-improvement-num">${i + 1}</div>
+            <div class="report-improvement-body">
+                <div class="report-improvement-title">${imp.title}</div>
+                <div class="report-improvement-desc">${imp.desc}</div>
+                ${imp.actions && imp.actions.length > 0 ? `
+                    <div class="report-improvement-actions">
+                        ${imp.actions.map(a => `<button class="report-improvement-btn" onclick="app.switchPage('${a.target}')">${a.label}</button>`).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+};
+
+/**
+ * AI深度分析
+ */
+WordCollectionApp.prototype.reportAIDeepAnalysis = async function() {
+    if (!this.reportData) {
+        this.showExamToast('请先生成报告');
+        return;
+    }
+
+    const container = document.getElementById('report-ai-advice');
+    container.innerHTML = '<div class="report-ai-loading">✨ AI 正在深度分析你的学习数据...</div>';
+
+    const apiKey = this.settings.apiKey;
+    if (!apiKey) {
+        // 本地生成建议
+        const localAdvice = this.generateLocalReportAdvice(this.reportData);
+        this.renderReportAIAdvice(localAdvice);
+        this.showExamToast('未设置API Key，已使用本地分析');
+        return;
+    }
+
+    try {
+        const report = this.reportData;
+        const prompt = `你是一位专业的英语学习诊断专家。请根据以下学生的学习数据，给出个性化的深度分析和建议。
+
+学生数据概要：
+- 综合得分：${report.overallScore}分
+- 能力维度：${JSON.stringify(report.dimensions)}
+- 错题总数：${report.wrongCount}
+- 高频错题：${report.frequentErrors.slice(0, 5).map(e => e.word + '(' + e.count + '次)').join('、')}
+- 错误模式：${report.patterns.map(p => p.name + '(' + p.count + '次)').join('、')}
+${report.examResult ? '- 试卷分析得分：' + (report.examResult.overview?.score || '未知') : ''}
+
+请给出4-6条深度建议，每条建议为一个JSON对象：
+{"title": "建议标题", "content": "详细内容（2-3句话）", "priority": "高/中/低"}
+
+以JSON数组格式返回：[{"title":"...","content":"...","priority":"..."}]`;
+
+        const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'qwen-turbo',
+                input: {
+                    messages: [
+                        { role: 'system', content: '你是一位专业的英语学习诊断专家，擅长分析学生数据并给出针对性建议。' },
+                        { role: 'user', content: prompt }
+                    ]
+                },
+                parameters: { result_format: 'message' }
+            })
+        });
+
+        if (!response.ok) throw new Error('API请求失败');
+        const data = await response.json();
+        const content = data.output?.choices?.[0]?.message?.content || '';
+
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            const advice = JSON.parse(jsonMatch[0]);
+            this.renderReportAIAdvice(advice);
+        } else {
+            // 解析失败，使用本地建议
+            const localAdvice = this.generateLocalReportAdvice(this.reportData);
+            this.renderReportAIAdvice(localAdvice);
+        }
+    } catch (err) {
+        console.error('AI分析失败:', err);
+        const localAdvice = this.generateLocalReportAdvice(this.reportData);
+        this.renderReportAIAdvice(localAdvice);
+        this.showExamToast('AI分析暂时不可用，已使用本地分析');
+    }
+};
+
+/**
+ * 渲染AI建议
+ */
+WordCollectionApp.prototype.renderReportAIAdvice = function(advice) {
+    const container = document.getElementById('report-ai-advice');
+    if (!advice || advice.length === 0) {
+        container.innerHTML = '<p class="report-empty">暂无建议</p>';
+        return;
+    }
+
+    container.innerHTML = advice.map(a => {
+        const priorityColor = a.priority === '高' ? '#f44336' : a.priority === '中' ? '#ff9800' : '#4caf50';
+        return `
+            <div class="report-ai-item">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span style="font-weight:600;">${a.title}</span>
+                    ${a.priority ? `<span style="font-size:11px;padding:1px 8px;border-radius:10px;background:${priorityColor}22;color:${priorityColor};">${a.priority}优先级</span>` : ''}
+                </div>
+                <div style="color:var(--text-muted);font-size:13px;">${a.content}</div>
+            </div>
+        `;
+    }).join('');
+};
+
+/**
+ * 生成本地报告建议（无API Key时兜底）
+ */
+WordCollectionApp.prototype.generateLocalReportAdvice = function(report) {
+    const advice = [];
+    const dims = report.dimensions;
+    const sorted = Object.entries(dims).sort((a, b) => a[1] - b[1]);
+
+    // 最薄弱维度建议
+    if (sorted[0] && sorted[0][1] < 60) {
+        advice.push({
+            title: `重点突破：${sorted[0][0]}`,
+            content: `你的${sorted[0][0]}得分仅${sorted[0][1]}分，是最需要提升的环节。建议每天安排30分钟专项训练，从基础题开始，逐步增加难度。`,
+            priority: '高'
+        });
+    }
+
+    // 高频错题建议
+    if (report.frequentErrors.length > 0) {
+        const topError = report.frequentErrors[0];
+        advice.push({
+            title: '攻克高频错题',
+            content: `"${topError.word}" 出现了${topError.count}次错误，建议重点复习这个词及其相关知识点，制作记忆卡片加深印象。`,
+            priority: '高'
+        });
+    }
+
+    // 错误模式建议
+    if (report.patterns.length > 0 && report.patterns[0].pct > 30) {
+        advice.push({
+            title: `改善错误模式：${report.patterns[0].name}`,
+            content: `${report.patterns[0].name}占你所有错误的${report.patterns[0].pct}%，说明存在系统性问题。建议梳理相关知识点，找到根本原因。`,
+            priority: '中'
+        });
+    }
+
+    // 优势保持建议
+    const strongest = sorted[sorted.length - 1];
+    if (strongest && strongest[1] >= 75) {
+        advice.push({
+            title: `保持优势：${strongest[0]}`,
+            content: `你的${strongest[0]}表现优秀（${strongest[1]}分），继续保持现有练习频率，同时可以尝试更高难度的挑战。`,
+            priority: '低'
+        });
+    }
+
+    // 综合建议
+    if (report.overallScore < 60) {
+        advice.push({
+            title: '制定系统学习计划',
+            content: '综合得分偏低，建议制定每日学习计划：早晨背单词30分钟，下午做阅读理解1篇，晚上复习错题本。坚持21天养成习惯。',
+            priority: '高'
+        });
+    } else {
+        advice.push({
+            title: '查漏补缺持续提升',
+            content: '整体基础不错，建议针对薄弱环节进行专项突破。每周做一次综合测试，追踪进步情况，及时调整学习策略。',
+            priority: '中'
+        });
+    }
+
+    return advice;
+};
+
+/**
+ * 导出错题集
+ */
+WordCollectionApp.prototype.exportErrorCollection = function() {
+    const wrongRecords = this.wrongRecords;
+    if (wrongRecords.length === 0 && !this.reportData) {
+        this.showExamToast('暂无错题可导出');
+        return;
+    }
+
+    const report = this.reportData || this.buildReportData(wrongRecords, Storage.getModuleStats(), this.getLastExamResult());
+    const dateStr = new Date().toISOString().slice(0, 10);
+
+    let csv = '\ufeff'; // BOM for Excel
+    csv += '词光 - 学习诊断报告与错题集\n';
+    csv += `生成时间,${new Date().toLocaleString('zh-CN')}\n`;
+    csv += `综合得分,${report.overallScore}分\n\n`;
+
+    // 能力维度
+    csv += '=== 能力维度评估 ===\n';
+    csv += '维度,得分\n';
+    Object.entries(report.dimensions).forEach(([name, score]) => {
+        csv += `${name},${score}\n`;
+    });
+    csv += '\n';
+
+    // 错题统计
+    csv += '=== 错题统计 ===\n';
+    csv += '类型,数量\n';
+    Object.entries(report.typeStats).forEach(([type, data]) => {
+        csv += `${type},${data.count}\n`;
+    });
+    csv += `总计,${report.wrongCount}\n\n`;
+
+    // 高频错题
+    csv += '=== 高频错题集 ===\n';
+    csv += '排名,单词,错误次数,释义\n';
+    report.frequentErrors.forEach((e, i) => {
+        const meaning = e.records?.[0]?.meaning || '';
+        csv += `${i + 1},"${e.word}",${e.count},"${meaning}"\n`;
+    });
+    csv += '\n';
+
+    // 所有错题
+    csv += '=== 全部错题明细 ===\n';
+    csv += '单词,类型,释义,正确答案,记录时间\n';
+    wrongRecords.forEach(r => {
+        csv += `"${r.word || ''}","${r.type || ''}","${r.meaning || ''}","${r.correctAnswer || ''}","${r.createdAt ? new Date(r.createdAt).toLocaleString('zh-CN') : ''}"\n`;
+    });
+    csv += '\n';
+
+    // 改进方向
+    csv += '=== 改进方向 ===\n';
+    csv += '序号,建议,详细说明\n';
+    report.improvements.forEach((imp, i) => {
+        csv += `${i + 1},"${imp.title}","${imp.desc}"\n`;
+    });
+
+    // 下载
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `词光_错题集_${dateStr}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    this.showExamToast('错题集已导出');
 };
 
 // ===== 初始化应用 =====
