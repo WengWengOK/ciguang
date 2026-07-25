@@ -844,50 +844,207 @@
             <div class="wrong-container">
                 <div class="wrong-header">
                     <h1>❌ 错题本</h1>
-                    <p class="subtitle">记录练习中的错题，方便回顾巩固薄弱环节</p>
-                    <div class="wrong-filter">
-                        <button class="wrong-filter-btn active" data-filter="all">全部</button>
-                        <button class="wrong-filter-btn" data-filter="practice">例句练习</button>
-                        <button class="wrong-filter-btn" data-filter="reading">阅读练习</button>
-                        <button class="wrong-filter-btn" data-filter="cloze">选词填空</button>
-                        <button class="wrong-filter-btn" data-filter="memory">单词记忆</button>
-                    </div>
-                    <!-- 新增：AI分析按钮 -->
-                    <button class="btn-ai-analysis" onclick="app.analyzeWrongWithAI()">AI分析</button>
-                    <div class="wrong-actions">
-                        <button class="btn-action" id="btn-clear-wrong">🗑️ 清空错题本</button>
-                    </div>
+                    <p class="subtitle">平台精选易错题 + 个人错题管理，拍照上传纸质错题</p>
                 </div>
-                <div class="wrong-stats" id="wrong-stats">
-                    <div class="wrong-stat-card">
-                        <span class="wrong-stat-number" id="wrong-total">0</span>
-                        <span class="wrong-stat-label">总错题数</span>
-                    </div>
-                    <div class="wrong-stat-card">
-                        <span class="wrong-stat-number" id="wrong-practice-count">0</span>
-                        <span class="wrong-stat-label">例句错题</span>
-                    </div>
-                    <div class="wrong-stat-card">
-                        <span class="wrong-stat-number" id="wrong-reading-count">0</span>
-                        <span class="wrong-stat-label">阅读错题</span>
-                    </div>
-                    <div class="wrong-stat-card">
-                        <span class="wrong-stat-number" id="wrong-cloze-count">0</span>
-                        <span class="wrong-stat-label">选词错题</span>
-                    </div>
-                    <div class="wrong-stat-card">
-                        <span class="wrong-stat-number" id="wrong-memory-count">0</span>
-                        <span class="wrong-stat-label">记忆错题</span>
-                    </div>
+
+                <!-- 主分区Tab -->
+                <div class="wrong-main-tabs">
+                    <button class="wrong-main-tab active" data-wrong-tab="platform">
+                        <span>📚</span> 平台错题
+                    </button>
+                    <button class="wrong-main-tab" data-wrong-tab="personal">
+                        <span>📝</span> 我的错题
+                    </button>
                 </div>
-                <div class="wrong-list" id="wrong-list">
-                    <div class="wrong-empty" id="wrong-empty">
-                        <div class="empty-icon">🎉</div>
-                        <p>暂无错题，继续保持！</p>
+
+                <!-- ===== 平台错题区 ===== -->
+                <div class="wrong-tab-content active" id="wrong-platform-content">
+                    <div class="platform-filter">
+                        <button class="platform-filter-btn active" data-platform-filter="all">全部</button>
+                        <button class="platform-filter-btn" data-platform-filter="vocab">词汇辨析</button>
+                        <button class="platform-filter-btn" data-platform-filter="grammar">语法易错</button>
+                        <button class="platform-filter-btn" data-platform-filter="reading">阅读陷阱</button>
+                        <button class="platform-filter-btn" data-platform-filter="translation">翻译误区</button>
+                        <button class="platform-filter-btn" data-platform-filter="writing">写作规范</button>
+                    </div>
+                    <div class="platform-error-list" id="platform-error-list"></div>
+                </div>
+
+                <!-- ===== 个人错题区 ===== -->
+                <div class="wrong-tab-content" id="wrong-personal-content">
+                    <div class="wrong-personal-toolbar">
+                        <div class="wrong-filter">
+                            <button class="wrong-filter-btn active" data-filter="all">全部</button>
+                            <button class="wrong-filter-btn" data-filter="practice">例句</button>
+                            <button class="wrong-filter-btn" data-filter="reading">阅读</button>
+                            <button class="wrong-filter-btn" data-filter="cloze">选词</button>
+                            <button class="wrong-filter-btn" data-filter="memory">记忆</button>
+                            <button class="wrong-filter-btn" data-filter="photo">📷 拍照</button>
+                        </div>
+                        <div class="wrong-personal-actions">
+                            <button class="btn-photo-upload" id="btn-photo-upload">📷 拍照上传</button>
+                            <button class="btn-manual-add" id="btn-manual-add">✏️ 手动添加</button>
+                            <button class="btn-ai-analysis" id="btn-ai-analysis">🤖 AI分析</button>
+                            <button class="btn-action" id="btn-clear-wrong">🗑️ 清空</button>
+                        </div>
+                    </div>
+                    <div class="wrong-stats" id="wrong-stats">
+                        <div class="wrong-stat-card">
+                            <span class="wrong-stat-number" id="wrong-total">0</span>
+                            <span class="wrong-stat-label">总错题数</span>
+                        </div>
+                        <div class="wrong-stat-card">
+                            <span class="wrong-stat-number" id="wrong-practice-count">0</span>
+                            <span class="wrong-stat-label">例句错题</span>
+                        </div>
+                        <div class="wrong-stat-card">
+                            <span class="wrong-stat-number" id="wrong-reading-count">0</span>
+                            <span class="wrong-stat-label">阅读错题</span>
+                        </div>
+                        <div class="wrong-stat-card">
+                            <span class="wrong-stat-number" id="wrong-cloze-count">0</span>
+                            <span class="wrong-stat-label">选词错题</span>
+                        </div>
+                        <div class="wrong-stat-card">
+                            <span class="wrong-stat-number" id="wrong-memory-count">0</span>
+                            <span class="wrong-stat-label">记忆错题</span>
+                        </div>
+                        <div class="wrong-stat-card">
+                            <span class="wrong-stat-number" id="wrong-photo-count">0</span>
+                            <span class="wrong-stat-label">拍照错题</span>
+                        </div>
+                    </div>
+                    <div class="wrong-list" id="wrong-list">
+                        <div class="wrong-empty" id="wrong-empty">
+                            <div class="empty-icon">🎉</div>
+                            <p>暂无错题，继续保持！</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
+
+        <!-- 拍照上传弹窗 -->
+        <div class="modal" id="photo-upload-modal" style="display:none;">
+            <div class="modal-content photo-upload-modal-content">
+                <div class="modal-header">
+                    <h2>📷 拍照上传错题</h2>
+                    <button class="modal-close" id="photo-modal-close">✕</button>
+                </div>
+                <div class="photo-upload-tabs">
+                    <button class="photo-upload-tab active" data-photo-tab="camera">📷 拍照</button>
+                    <button class="photo-upload-tab" data-photo-tab="file">📁 选择文件</button>
+                </div>
+                <div class="photo-upload-body">
+                    <!-- 拍照区 -->
+                    <div class="photo-tab-content active" id="photo-camera-tab">
+                        <div class="camera-preview-area" id="wrong-camera-area">
+                            <div class="camera-placeholder" id="wrong-camera-placeholder">
+                                <span class="camera-placeholder-icon">📷</span>
+                                <p>点击下方按钮启动摄像头</p>
+                            </div>
+                            <video id="wrong-camera-video" autoplay playsinline style="display:none;"></video>
+                            <canvas id="wrong-camera-canvas" style="display:none;"></canvas>
+                            <img id="wrong-camera-photo" class="camera-photo-preview" style="display:none;" alt="拍照预览">
+                        </div>
+                        <div class="camera-controls" id="wrong-camera-controls">
+                            <button class="btn-camera-start" id="btn-wrong-camera-start">📷 启动摄像头</button>
+                            <button class="btn-camera-snap" id="btn-wrong-camera-snap" style="display:none;">📸 拍照</button>
+                            <button class="btn-camera-retake" id="btn-wrong-camera-retake" style="display:none;">🔄 重新拍</button>
+                            <button class="btn-camera-confirm" id="btn-wrong-camera-confirm" style="display:none;">✅ 确认使用</button>
+                        </div>
+                    </div>
+                    <!-- 文件上传区 -->
+                    <div class="photo-tab-content" id="photo-file-tab">
+                        <div class="file-upload-zone" id="wrong-file-zone">
+                            <span class="file-upload-icon">📁</span>
+                            <p>点击选择图片或拖拽图片到此处</p>
+                            <p class="file-upload-hint">支持 JPG / PNG / WEBP 格式</p>
+                            <input type="file" id="wrong-file-input" accept="image/*" style="display:none;">
+                        </div>
+                        <img id="wrong-file-preview" class="camera-photo-preview" style="display:none;" alt="文件预览">
+                    </div>
+                    <!-- 错题信息填写 -->
+                    <div class="photo-error-form" id="photo-error-form" style="display:none;">
+                        <div class="form-group">
+                            <label>错误类型</label>
+                            <select id="photo-error-type">
+                                <option value="photo">📷 拍照错题</option>
+                                <option value="practice">例句练习</option>
+                                <option value="reading">阅读理解</option>
+                                <option value="cloze">选词填空</option>
+                                <option value="memory">单词记忆</option>
+                                <option value="translation">翻译练习</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>相关单词/知识点（可选）</label>
+                            <input type="text" id="photo-error-word" placeholder="如：affect/effect">
+                        </div>
+                        <div class="form-group">
+                            <label>备注说明（可选）</label>
+                            <textarea id="photo-error-note" rows="3" placeholder="记录错因、知识点或需要注意的地方..."></textarea>
+                        </div>
+                        <button class="btn-save-photo-error" id="btn-save-photo-error">💾 保存错题</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 手动添加错题弹窗 -->
+        <div class="modal" id="manual-add-modal" style="display:none;">
+            <div class="modal-content manual-add-modal-content">
+                <div class="modal-header">
+                    <h2>✏️ 手动添加错题</h2>
+                    <button class="modal-close" id="manual-modal-close">✕</button>
+                </div>
+                <div class="manual-add-body">
+                    <div class="form-group">
+                        <label>错误类型 *</label>
+                        <select id="manual-error-type">
+                            <option value="practice">例句练习</option>
+                            <option value="reading">阅读理解</option>
+                            <option value="cloze">选词填空</option>
+                            <option value="memory">单词记忆</option>
+                            <option value="translation">翻译练习</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>相关单词/词组 *</label>
+                        <input type="text" id="manual-error-word" placeholder="如：abandon">
+                    </div>
+                    <div class="form-group">
+                        <label>释义（可选）</label>
+                        <input type="text" id="manual-error-meaning" placeholder="如：v. 放弃">
+                    </div>
+                    <div class="form-group">
+                        <label>题目内容（可选）</label>
+                        <textarea id="manual-error-question" rows="2" placeholder="记录题目内容..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>正确答案（可选）</label>
+                        <input type="text" id="manual-error-correct" placeholder="正确答案">
+                    </div>
+                    <div class="form-group">
+                        <label>你的答案（可选）</label>
+                        <input type="text" id="manual-error-user" placeholder="你填写的答案">
+                    </div>
+                    <div class="form-group">
+                        <label>备注（可选）</label>
+                        <textarea id="manual-error-note" rows="2" placeholder="错因分析、知识点..."></textarea>
+                    </div>
+                    <button class="btn-save-manual-error" id="btn-save-manual-error">💾 保存错题</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图片查看弹窗 -->
+        <div class="modal" id="image-viewer-modal" style="display:none;">
+            <div class="modal-content image-viewer-content">
+                <button class="modal-close" id="image-viewer-close">✕</button>
+                <img id="image-viewer-img" src="" alt="错题图片">
+            </div>
+        </div>
 
         <section id="saved-page" class="page">
             <div class="saved-container">

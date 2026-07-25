@@ -1329,13 +1329,85 @@ class WordCollectionApp {
         });
 
         // 错题本相关
+        this.initWrongPageEvents();
+    }
+    
+    // ===== 错题本页面事件初始化 =====
+    initWrongPageEvents() {
+        // 清空按钮
         document.getElementById('btn-clear-wrong')?.addEventListener('click', () => this.clearWrongRecords());
+
+        // 个人错题筛选
         document.querySelectorAll('.wrong-filter-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.wrong-filter-btn').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
                 this.renderWrongList(e.target.dataset.filter);
             });
+        });
+
+        // 主分区Tab切换
+        document.querySelectorAll('.wrong-main-tab').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.wrong-main-tab').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.wrong-tab-content').forEach(c => c.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                const tab = e.currentTarget.dataset.wrongTab;
+                document.getElementById(`wrong-${tab}-content`).classList.add('active');
+                if (tab === 'platform') this.renderPlatformErrors('all');
+            });
+        });
+
+        // 平台错题筛选
+        document.querySelectorAll('.platform-filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.platform-filter-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.renderPlatformErrors(e.target.dataset.platformFilter);
+            });
+        });
+
+        // 拍照上传
+        document.getElementById('btn-photo-upload')?.addEventListener('click', () => this.openPhotoUploadModal());
+        document.getElementById('photo-modal-close')?.addEventListener('click', () => this.closePhotoUploadModal());
+
+        // 拍照上传Tab切换
+        document.querySelectorAll('.photo-upload-tab').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.photo-upload-tab').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.photo-tab-content').forEach(c => c.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                const tab = e.currentTarget.dataset.photoTab;
+                document.getElementById(`photo-${tab}-tab`).classList.add('active');
+            });
+        });
+
+        // 摄像头控制
+        document.getElementById('btn-wrong-camera-start')?.addEventListener('click', () => this.startWrongCamera());
+        document.getElementById('btn-wrong-camera-snap')?.addEventListener('click', () => this.snapWrongPhoto());
+        document.getElementById('btn-wrong-camera-retake')?.addEventListener('click', () => this.retakeWrongPhoto());
+        document.getElementById('btn-wrong-camera-confirm')?.addEventListener('click', () => this.confirmWrongPhoto());
+
+        // 文件上传
+        document.getElementById('wrong-file-zone')?.addEventListener('click', () => {
+            document.getElementById('wrong-file-input').click();
+        });
+        document.getElementById('wrong-file-input')?.addEventListener('change', (e) => this.handleWrongFileSelect(e));
+
+        // 保存拍照错题
+        document.getElementById('btn-save-photo-error')?.addEventListener('click', () => this.savePhotoError());
+
+        // 手动添加
+        document.getElementById('btn-manual-add')?.addEventListener('click', () => this.openManualAddModal());
+        document.getElementById('manual-modal-close')?.addEventListener('click', () => this.closeManualAddModal());
+        document.getElementById('btn-save-manual-error')?.addEventListener('click', () => this.saveManualError());
+
+        // AI分析
+        document.getElementById('btn-ai-analysis')?.addEventListener('click', () => this.analyzeWrongPatterns());
+
+        // 图片查看器关闭
+        document.getElementById('image-viewer-close')?.addEventListener('click', () => {
+            document.getElementById('image-viewer-modal').style.display = 'none';
         });
     }
     
@@ -1546,6 +1618,7 @@ class WordCollectionApp {
             if (!this.memoryCurrentWord) this.startMemoryPractice();
         } else if (page === 'wrong') {
             this.renderWrongList();
+            this.renderPlatformErrors('all');
         } else if (page === 'exam') {
             this.initExamPage();
         } else if (page === 'report') {
@@ -4497,7 +4570,7 @@ ${sentences.map((s, idx) => {
     // 渲染错题列表
     renderWrongList(filter = 'all') {
         const list = document.getElementById('wrong-list');
-        const filtered = filter === 'all' ? this.wrongRecords : this.wrongRecords.filter(r => r.type === filter);
+        let filtered = filter === 'all' ? this.wrongRecords : this.wrongRecords.filter(r => r.type === filter);
 
         // 更新统计数据
         document.getElementById('wrong-total').textContent = this.wrongRecords.length;
@@ -4505,25 +4578,31 @@ ${sentences.map((s, idx) => {
         document.getElementById('wrong-reading-count').textContent = this.wrongRecords.filter(r => r.type === 'reading').length;
         document.getElementById('wrong-cloze-count').textContent = this.wrongRecords.filter(r => r.type === 'cloze').length;
         document.getElementById('wrong-memory-count').textContent = this.wrongRecords.filter(r => r.type === 'memory').length;
+        const photoCountEl = document.getElementById('wrong-photo-count');
+        if (photoCountEl) photoCountEl.textContent = this.wrongRecords.filter(r => r.type === 'photo' || r.image).length;
 
         if (filtered.length === 0) {
             list.innerHTML = '<div class="wrong-empty"><div class="empty-icon">🎉</div><p>暂无错题，继续保持！</p></div>';
             return;
         }
 
+        const typeMap = {practice: '例句练习', reading: '阅读练习', cloze: '选词填空', memory: '单词记忆', photo: '📷 拍照错题', translation: '翻译练习'};
+
         list.innerHTML = filtered.map(record => `
             <div class="wrong-item" data-id="${record.id}">
                 <div class="wrong-item-header">
-                    <span class="wrong-item-type ${record.type}">${{practice: '例句练习', reading: '阅读练习', cloze: '选词填空', memory: '单词记忆'}[record.type] || record.type}</span>
+                    <span class="wrong-item-type ${record.type}">${typeMap[record.type] || record.type}</span>
                     <span class="wrong-item-time">${new Date(record.createdAt).toLocaleString('zh-CN')}</span>
                 </div>
-                <div class="wrong-item-word">${record.word}</div>
-                <div class="wrong-item-meaning">${record.meaning || ''}</div>
+                ${record.word ? `<div class="wrong-item-word">${record.word}</div>` : ''}
+                ${record.meaning ? `<div class="wrong-item-meaning">${record.meaning}</div>` : ''}
                 ${record.question ? `<div class="wrong-item-question">${record.question}</div>` : ''}
                 ${record.correctAnswer ? `<div class="wrong-item-answer">正确答案：${record.correctAnswer}</div>` : ''}
                 ${record.userAnswer ? `<div class="wrong-item-user-answer">你的答案：${record.userAnswer}</div>` : ''}
+                ${record.image ? `<div class="wrong-item-photo" onclick="app.viewImage('${record.id}')"><img src="${record.image}" alt="错题图片"></div>` : ''}
+                ${record.note ? `<div class="wrong-item-note">📝 ${record.note}</div>` : ''}
                 <div class="wrong-item-actions">
-                    <button onclick="app.practiceWrongItem('${record.id}')">🔄 重新练习</button>
+                    ${record.type !== 'photo' ? `<button onclick="app.practiceWrongItem('${record.id}')">🔄 重新练习</button>` : ''}
                     <button class="btn-remove" onclick="app.removeWrongRecord('${record.id}')">❌ 移除</button>
                 </div>
             </div>
@@ -4551,6 +4630,354 @@ ${sentences.map((s, idx) => {
             this.switchPage('cloze');
             this.generateRandomCloze();
         }
+    }
+
+    // ===== 平台错题数据 =====
+    getPlatformErrors() {
+        return [
+            // 词汇辨析
+            { category: 'vocab', title: 'affect vs effect', difficulty: '⭐⭐',
+              desc: 'affect 通常作动词（影响），effect 通常作名词（效果、结果）。但 effect 也可作动词表示"促成"。',
+              examples: ['✅ The weather <b>affects</b> my mood.', '❌ The weather <b class="wrong-text">effects</b> my mood.',
+                         '✅ The medicine had an immediate <b>effect</b>.', '❌ The medicine had an immediate <b class="wrong-text">affect</b>.'],
+              tip: '💡 记忆口诀：RAVEN — Remember, Affect = Verb, Effect = Noun' },
+            { category: 'vocab', title: 'adapt / adopt / adept', difficulty: '⭐⭐⭐',
+              desc: 'adapt (适应/改编)、adopt (收养/采纳)、adept (熟练的/内行) 三个词形近义异。',
+              examples: ['✅ She <b>adapted</b> to the new environment quickly.', '✅ They <b>adopted</b> a new strategy.',
+                         '✅ He is <b>adept</b> at solving complex problems.'],
+              tip: '💡 adapt 有"apt"=适合→适应；adopt 有"opt"=选择→采纳；adept 是形容词→精通的' },
+            { category: 'vocab', title: 'compliment vs complement', difficulty: '⭐⭐⭐',
+              desc: 'compliment = 赞美/恭维，complement = 补充/互补。两者只差一个字母 i/e。',
+              examples: ['✅ Thank you for the <b>compliment</b>. (感谢赞美)', '✅ Wine <b>complements</b> cheese. (红酒配奶酪相得益彰)'],
+              tip: '💡 compli<i>ment</i> 中有 i → I like compliments（我喜欢赞美）；comple<i>ment</i> → complete（使完整）' },
+            { category: 'vocab', title: 'principal vs principle', difficulty: '⭐⭐',
+              desc: 'principal 可作形容词（主要的）或名词（校长/本金），principle 是名词（原则/原理）。',
+              examples: ['✅ The <b>principal</b> reason is cost.', '✅ She is a woman of <b>principles</b>.'],
+              tip: '💡 princi<i>pal</i> 结尾 pal = 人 → 校长/主要的；princi<i>ple</i> 结尾 ple = rule → 原则' },
+            { category: 'vocab', title: 'stationary vs stationery', difficulty: '⭐⭐⭐',
+              desc: 'stationary = 静止的/不动的，stationery = 文具。只差末尾 a/e。',
+              examples: ['✅ The car was <b>stationary</b> at the red light.', '✅ I bought some <b>stationery</b> at the store.'],
+              tip: '💡 station<i>ary</i> 中 a → st<b>a</b>nd（站立不动）；station<i>ery</i> 中 e → <b>e</b>raser（橡皮=文具）' },
+
+            // 语法易错
+            { category: 'grammar', title: '主谓一致：集合名词', difficulty: '⭐⭐',
+              desc: 'family, team, class 等集合名词，强调整体时用单数，强调成员时用复数。',
+              examples: ['✅ My family <b>is</b> large. (整体)', '✅ My family <b>are</b> watching TV. (各成员)'],
+              tip: '💡 看作一个整体→单数；看作多个成员→复数。语境决定用法' },
+            { category: 'grammar', title: '时态混用：现在完成时 vs 一般过去时', difficulty: '⭐⭐⭐',
+              desc: '现在完成时强调过去动作对现在的影响，一般过去时仅陈述过去事实。不能与明确的过去时间连用。',
+              examples: ['✅ I <b>have lived</b> here for 5 years. (到现在仍住)', '❌ I <b class="wrong-text">have lived</b> here in 2020. (有明确过去时间)',
+                         '✅ I <b>lived</b> there in 2020.'],
+              tip: '💡 有明确过去时间(in 2020, yesterday)→一般过去时；强调持续到现在→现在完成时' },
+            { category: 'grammar', title: '虚拟语气：if 条件句', difficulty: '⭐⭐⭐⭐',
+              desc: '与现在事实相反：If + 过去时, would + 动词原形。与过去事实相反：If + had done, would have done。',
+              examples: ['✅ If I <b>were</b> you, I <b>would go</b>. (与现在相反)', '✅ If I <b>had known</b>, I <b>would have helped</b>. (与过去相反)'],
+              tip: '💡 与现在相反→过去时+would do；与过去相反→had done+would have done。注意 were 不用 was' },
+            { category: 'grammar', title: '定语从句：that vs which', difficulty: '⭐⭐',
+              desc: '限定性定语从句中 that 和 which 都可用（修饰物），但非限定性定语从句（有逗号）只能用 which。',
+              examples: ['✅ The book <b>that/which</b> I bought is great. (限定)', '✅ The book, <b>which</b> is red, is mine. (非限定，不能用that)',
+                         '❌ The book, <b class="wrong-text">that</b> is red, is mine.'],
+              tip: '💡 有逗号→which；无逗号→that 或 which 均可。修饰人时用 who/whom/that' },
+
+            // 阅读陷阱
+            { category: 'reading', title: '推理题：过度推断', difficulty: '⭐⭐⭐',
+              desc: '推理题要求基于文本合理推断，不能加入个人主观臆断或超出文本范围的结论。',
+              examples: ['✅ 文本说"他皱了皱眉" → 推断"他感到不满"', '❌ 文本说"他皱了皱眉" → 推断"他讨厌这个人"（过度推断）'],
+              tip: '💡 推理必须"有据可依"，答案比文本多走一步但不能多走十步。排除绝对化选项' },
+            { category: 'reading', title: '主旨题：以偏概全', difficulty: '⭐⭐',
+              desc: '主旨题应选涵盖全文核心观点的选项，不能选择只涉及某一段落细节的选项。',
+              examples: ['✅ 全文讨论气候变化的影响 → 选"气候变化的多方面影响"', '❌ 选"海平面上升对沿海城市的影响"（仅第三段内容）'],
+              tip: '💡 主旨选项应能概括全文，范围太大或太小都不对。注意首尾段和各段首句' },
+            { category: 'reading', title: '细节题：偷换概念', difficulty: '⭐⭐⭐',
+              desc: '错误选项常使用原文相似词汇但改变关键信息，如把"most"改为"all"，把"may"改为"must"。',
+              examples: ['✅ 原文: "Most students prefer online learning." → 选项: "The majority favor online learning."', '❌ 选项: "All students prefer online learning."（most→all）'],
+              tip: '💡 警惕程度副词替换(most→all, may→must)、否定词偷换、因果倒置' },
+
+            // 翻译误区
+            { category: 'translation', title: '直译陷阱：中英文语序差异', difficulty: '⭐⭐⭐',
+              desc: '中文定语常前置，英文长定语需后置或用从句。直译会导致语法错误或表达不自然。',
+              examples: ['❌ <b class="wrong-text">I yesterday in the park saw a very big dog.</b>', '✅ I saw a very big dog in the park yesterday.'],
+              tip: '💡 英文基本语序：主+谓+宾+地点+时间。长定语用定语从句后置' },
+            { category: 'translation', title: '被动语态滥用', difficulty: '⭐⭐',
+              desc: '中文较少用被动句，英文在客观描述、强调动作承受者时常用被动。但翻译时不应机械转换。',
+              examples: ['❌ <b class="wrong-text">The problem was solved by him.</b>（不自然）', '✅ He solved the problem.（更自然）'],
+              tip: '💡 英译中时减少被动句；中译英时适当使用被动句使表达更地道' },
+            { category: 'translation', title: '文化负载词处理', difficulty: '⭐⭐⭐⭐',
+              desc: '含有文化特有概念的词（如"龙""风水""饺子"）不能简单直译，需根据语境采用音译、意译或加注。',
+              examples: ['✅ 龙 → dragon (但注意中西方dragon含义不同)', '✅ 饺子 → dumplings / jiaozi', '✅ 望子成龙 → hope one\'s child will have a bright future'],
+              tip: '💡 文化负载词翻译三策略：音译+注释、意译、功能对等。根据读者对象选择' },
+
+            // 写作规范
+            { category: 'writing', title: '段落主题句缺失', difficulty: '⭐⭐',
+              desc: '英文段落应以主题句开头，明确表达段落核心观点，然后展开论证或举例。',
+              examples: ['❌ 直接举例无主题句 → 读者不知段落主旨', '✅ "Online learning has three main advantages." → 清晰的主题句'],
+              tip: '💡 每段第一句应为主题句(Topic Sentence)，后续句子围绕它展开论证' },
+            { category: 'writing', title: '连接词使用不当', difficulty: '⭐⭐⭐',
+              desc: '连接词是逻辑连贯的关键，误用会导致语义关系混乱。',
+              examples: ['❌ "It was raining. <b class="wrong-text">Therefore</b>, I forgot my umbrella."（因果错乱）', '✅ "It was raining, <b>so</b> I forgot my umbrella."',
+                         '✅ "It was raining. <b>However</b>, I still went out."'],
+              tip: '💡 常见连接词：因果(so/therefore)、转折(but/however)、递进(furthermore/moreover)、举例(for instance)' },
+            { category: 'writing', title: '词汇重复与搭配不当', difficulty: '⭐⭐',
+              desc: '反复使用同一词汇降低文章质量，且中式英语搭配在考试中会失分。',
+              examples: ['❌ "I <b class="wrong-text">think</b>... I <b class="wrong-text">think</b>... I <b class="wrong-text">think</b>..."', '✅ "I believe... In my opinion... From my perspective..."',
+                         '❌ <b class="wrong-text">learn knowledge</b>（中式搭配）', '✅ <b>acquire knowledge</b>'],
+              tip: '💡 积累同义替换词组；避免中式搭配(learn knowledge→acquire, open light→turn on)' }
+        ];
+    }
+
+    // 渲染平台错题
+    renderPlatformErrors(filter = 'all') {
+        const container = document.getElementById('platform-error-list');
+        if (!container) return;
+
+        const allErrors = this.getPlatformErrors();
+        const errors = filter === 'all' ? allErrors : allErrors.filter(e => e.category === filter);
+
+        const categoryMap = {
+            vocab: '词汇辨析', grammar: '语法易错', reading: '阅读陷阱',
+            translation: '翻译误区', writing: '写作规范'
+        };
+
+        if (errors.length === 0) {
+            container.innerHTML = '<div class="wrong-empty"><div class="empty-icon">📚</div><p>暂无该分类的错题</p></div>';
+            return;
+        }
+
+        container.innerHTML = errors.map(e => `
+            <div class="platform-error-card" data-category="${e.category}">
+                <div class="platform-error-header">
+                    <span class="platform-error-category ${e.category}">${categoryMap[e.category]}</span>
+                    <span class="platform-error-difficulty">${e.difficulty}</span>
+                </div>
+                <div class="platform-error-title">${e.title}</div>
+                <div class="platform-error-desc">${e.desc}</div>
+                <div class="platform-error-examples">
+                    ${e.examples.map(ex => `<div class="platform-error-example">${ex}</div>`).join('')}
+                </div>
+                <div class="platform-error-tip">
+                    <span class="platform-error-tip-icon">${e.tip.substring(0, 2)}</span>
+                    <span>${e.tip.substring(2)}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // ===== 拍照上传弹窗 =====
+    openPhotoUploadModal() {
+        document.getElementById('photo-upload-modal').style.display = 'flex';
+        this.wrongCapturedImage = null;
+        this.wrongCameraStream = null;
+        this.resetPhotoUploadForm();
+    }
+
+    closePhotoUploadModal() {
+        document.getElementById('photo-upload-modal').style.display = 'none';
+        this.stopWrongCamera();
+        this.resetPhotoUploadForm();
+    }
+
+    resetPhotoUploadForm() {
+        document.getElementById('wrong-camera-placeholder').style.display = 'flex';
+        document.getElementById('wrong-camera-video').style.display = 'none';
+        document.getElementById('wrong-camera-photo').style.display = 'none';
+        document.getElementById('btn-wrong-camera-start').style.display = 'inline-block';
+        document.getElementById('btn-wrong-camera-snap').style.display = 'none';
+        document.getElementById('btn-wrong-camera-retake').style.display = 'none';
+        document.getElementById('btn-wrong-camera-confirm').style.display = 'none';
+        document.getElementById('photo-error-form').style.display = 'none';
+        document.getElementById('wrong-file-preview').style.display = 'none';
+        document.getElementById('wrong-file-zone').style.display = 'flex';
+        this.wrongCapturedImage = null;
+    }
+
+    startWrongCamera() {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                this.wrongCameraStream = stream;
+                const video = document.getElementById('wrong-camera-video');
+                video.srcObject = stream;
+                video.style.display = 'block';
+                document.getElementById('wrong-camera-placeholder').style.display = 'none';
+                document.getElementById('btn-wrong-camera-start').style.display = 'none';
+                document.getElementById('btn-wrong-camera-snap').style.display = 'inline-block';
+            })
+            .catch(err => {
+                alert('无法访问摄像头：' + err.message + '\n请使用"选择文件"方式上传图片。');
+            });
+    }
+
+    snapWrongPhoto() {
+        const video = document.getElementById('wrong-camera-video');
+        const canvas = document.getElementById('wrong-camera-canvas');
+        const photo = document.getElementById('wrong-camera-photo');
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        photo.src = dataUrl;
+        this.wrongCapturedImage = dataUrl;
+
+        photo.style.display = 'block';
+        video.style.display = 'none';
+        document.getElementById('btn-wrong-camera-snap').style.display = 'none';
+        document.getElementById('btn-wrong-camera-retake').style.display = 'inline-block';
+        document.getElementById('btn-wrong-camera-confirm').style.display = 'inline-block';
+    }
+
+    retakeWrongPhoto() {
+        const video = document.getElementById('wrong-camera-video');
+        video.style.display = 'block';
+        document.getElementById('wrong-camera-photo').style.display = 'none';
+        document.getElementById('btn-wrong-camera-snap').style.display = 'inline-block';
+        document.getElementById('btn-wrong-camera-retake').style.display = 'none';
+        document.getElementById('btn-wrong-camera-confirm').style.display = 'none';
+        this.wrongCapturedImage = null;
+    }
+
+    confirmWrongPhoto() {
+        if (!this.wrongCapturedImage) return;
+        this.stopWrongCamera();
+        document.getElementById('wrong-camera-photo').style.display = 'block';
+        document.getElementById('btn-wrong-camera-retake').style.display = 'none';
+        document.getElementById('btn-wrong-camera-confirm').style.display = 'none';
+        document.getElementById('photo-error-form').style.display = 'block';
+    }
+
+    stopWrongCamera() {
+        if (this.wrongCameraStream) {
+            this.wrongCameraStream.getTracks().forEach(t => t.stop());
+            this.wrongCameraStream = null;
+        }
+    }
+
+    handleWrongFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('请选择图片文件');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const dataUrl = ev.target.result;
+            // 压缩图片
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxW = 1200, maxH = 1200;
+                let { width, height } = img;
+                if (width > maxW) { height = height * maxW / width; width = maxW; }
+                if (height > maxH) { width = width * maxH / height; height = maxH; }
+                canvas.width = width;
+                canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                this.wrongCapturedImage = canvas.toDataURL('image/jpeg', 0.8);
+
+                const preview = document.getElementById('wrong-file-preview');
+                preview.src = this.wrongCapturedImage;
+                preview.style.display = 'block';
+                document.getElementById('wrong-file-zone').style.display = 'none';
+                document.getElementById('photo-error-form').style.display = 'block';
+            };
+            img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    savePhotoError() {
+        if (!this.wrongCapturedImage) {
+            alert('请先拍照或选择图片');
+            return;
+        }
+
+        const type = document.getElementById('photo-error-type').value;
+        const word = document.getElementById('photo-error-word').value.trim();
+        const note = document.getElementById('photo-error-note').value.trim();
+
+        const record = {
+            type: type === 'photo' ? 'photo' : type,
+            word: word || '拍照错题',
+            meaning: '',
+            question: '',
+            correctAnswer: '',
+            userAnswer: '',
+            image: this.wrongCapturedImage,
+            note: note || '',
+            source: 'photo'
+        };
+
+        this.addWrongRecord(record);
+        this.closePhotoUploadModal();
+        this.renderWrongList();
+        this.showWrongToast('✅ 错题已保存');
+    }
+
+    // ===== 手动添加错题 =====
+    openManualAddModal() {
+        document.getElementById('manual-add-modal').style.display = 'flex';
+        // 清空表单
+        document.getElementById('manual-error-type').value = 'practice';
+        document.getElementById('manual-error-word').value = '';
+        document.getElementById('manual-error-meaning').value = '';
+        document.getElementById('manual-error-question').value = '';
+        document.getElementById('manual-error-correct').value = '';
+        document.getElementById('manual-error-user').value = '';
+        document.getElementById('manual-error-note').value = '';
+    }
+
+    closeManualAddModal() {
+        document.getElementById('manual-add-modal').style.display = 'none';
+    }
+
+    saveManualError() {
+        const type = document.getElementById('manual-error-type').value;
+        const word = document.getElementById('manual-error-word').value.trim();
+        if (!word) {
+            alert('请填写相关单词/词组');
+            return;
+        }
+        const meaning = document.getElementById('manual-error-meaning').value.trim();
+        const question = document.getElementById('manual-error-question').value.trim();
+        const correctAnswer = document.getElementById('manual-error-correct').value.trim();
+        const userAnswer = document.getElementById('manual-error-user').value.trim();
+        const note = document.getElementById('manual-error-note').value.trim();
+
+        const record = {
+            type: type,
+            word: word,
+            meaning: meaning,
+            question: question,
+            correctAnswer: correctAnswer,
+            userAnswer: userAnswer,
+            note: note,
+            source: 'manual'
+        };
+
+        this.addWrongRecord(record);
+        this.closeManualAddModal();
+        this.renderWrongList();
+        this.showWrongToast('✅ 错题已添加');
+    }
+
+    // ===== 图片查看器 =====
+    viewImage(id) {
+        const record = this.wrongRecords.find(r => r.id == id);
+        if (!record || !record.image) return;
+        document.getElementById('image-viewer-img').src = record.image;
+        document.getElementById('image-viewer-modal').style.display = 'flex';
+    }
+
+    // ===== 错题提示Toast =====
+    showWrongToast(msg) {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg-card);color:var(--text-primary);padding:12px 24px;border-radius:var(--radius-md);border:1px solid var(--accent);box-shadow:var(--shadow-md);z-index:10000;font-size:0.9rem;transition:opacity 0.3s;';
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2000);
     }
 
     // ===== 统计功能 =====
