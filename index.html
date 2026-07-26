@@ -41,6 +41,9 @@
             <button class="nav-tab" data-page="wrong">
                 <span>❌</span> 错题本
             </button>
+            <button class="nav-tab" data-page="review">
+                <span>🔄</span> 复习
+            </button>
             <button class="nav-tab" data-page="stats">
                 <span>📊</span> 统计
             </button>
@@ -966,6 +969,20 @@
                     </div>
                     <!-- 错题信息填写 -->
                     <div class="photo-error-form" id="photo-error-form" style="display:none;">
+                        <!-- OCR分析加载中 -->
+                        <div class="ocr-loading" id="ocr-loading" style="display:none;">
+                            <div class="ocr-loading-spinner"></div>
+                            <p>🔍 正在识别图片并进行AI归因分析...</p>
+                            <p class="ocr-loading-hint">这可能需要几秒钟，请稍候</p>
+                        </div>
+                        <!-- OCR分析结果 -->
+                        <div class="ocr-result" id="ocr-result" style="display:none;">
+                            <div class="ocr-result-header">
+                                <span class="ocr-result-title">🤖 AI识别结果</span>
+                                <button class="btn-re-ocr" id="btn-re-ocr" onclick="app.reAnalyzePhoto()">🔄 重新识别</button>
+                            </div>
+                            <div class="ocr-result-body" id="ocr-result-body"></div>
+                        </div>
                         <div class="form-group">
                             <label>错误类型</label>
                             <select id="photo-error-type">
@@ -980,6 +997,10 @@
                         <div class="form-group">
                             <label>相关单词/知识点（可选）</label>
                             <input type="text" id="photo-error-word" placeholder="如：affect/effect">
+                        </div>
+                        <div class="form-group">
+                            <label>题目内容（可选）</label>
+                            <textarea id="photo-error-question" rows="2" placeholder="AI识别后将自动填充，也可手动编辑"></textarea>
                         </div>
                         <div class="form-group">
                             <label>备注说明（可选）</label>
@@ -1046,6 +1067,89 @@
             </div>
         </div>
 
+        <!-- 复习页面 - 艾宾浩斯遗忘曲线 -->
+        <section id="review-page" class="page">
+            <div class="review-container">
+                <!-- 复习概览 -->
+                <div class="review-overview" id="review-overview">
+                    <h2>🔄 智能复习</h2>
+                    <p class="review-desc">基于艾宾浩斯遗忘曲线，科学安排复习时间</p>
+                    <div class="review-stats-grid">
+                        <div class="review-stat-card">
+                            <div class="review-stat-value" id="review-pending-count">0</div>
+                            <div class="review-stat-label">待复习</div>
+                        </div>
+                        <div class="review-stat-card">
+                            <div class="review-stat-value" id="review-total-count">0</div>
+                            <div class="review-stat-label">学习中</div>
+                        </div>
+                        <div class="review-stat-card">
+                            <div class="review-stat-value" id="review-mastered-count">0</div>
+                            <div class="review-stat-label">已掌握</div>
+                        </div>
+                    </div>
+                    <button class="btn-start-review" id="btn-start-review" onclick="app.startReviewSession()">
+                        🚀 开始复习
+                    </button>
+                </div>
+
+                <!-- 闪卡复习区域 -->
+                <div class="review-flashcard-area" id="review-flashcard-area" style="display:none;">
+                    <div class="review-progress">
+                        <div class="review-progress-header">
+                            <span id="review-progress-text">1 / 10</span>
+                            <button class="btn-exit-review" onclick="app.exitReviewSession()" title="退出复习">✕</button>
+                        </div>
+                        <div class="review-progress-bar">
+                            <div class="review-progress-fill" id="review-progress-fill"></div>
+                        </div>
+                    </div>
+
+                    <!-- 闪卡容器 -->
+                    <div class="flashcard-container" id="flashcard-container">
+                        <div class="flashcard" id="flashcard" onclick="app.flipFlashcard()">
+                            <div class="flashcard-front" id="flashcard-front">
+                                <div class="flashcard-type" id="flashcard-type">词汇</div>
+                                <div class="flashcard-content" id="flashcard-question">abandon</div>
+                                <div class="flashcard-hint">点击翻面查看答案</div>
+                            </div>
+                            <div class="flashcard-back" id="flashcard-back">
+                                <div class="flashcard-type" id="flashcard-type-back">答案</div>
+                                <div class="flashcard-content" id="flashcard-answer">放弃；抛弃</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 复习操作按钮 -->
+                    <div class="review-actions">
+                        <button class="btn-review-wrong" onclick="app.submitReviewAnswer(false)">
+                            ❌ 没记住
+                        </button>
+                        <button class="btn-review-correct" onclick="app.submitReviewAnswer(true)">
+                            ✅ 记住了
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 复习完成区域 -->
+                <div class="review-complete" id="review-complete" style="display:none;">
+                    <div class="review-complete-icon">🎉</div>
+                    <h3>复习完成！</h3>
+                    <div class="review-complete-stats" id="review-complete-stats"></div>
+                    <button class="btn-back-to-review" onclick="app.showReviewOverview()">
+                        返回复习概览
+                    </button>
+                </div>
+
+                <!-- 空状态 -->
+                <div class="review-empty" id="review-empty" style="display:none;">
+                    <div class="review-empty-icon">✨</div>
+                    <h3>暂无待复习内容</h3>
+                    <p>继续学习，系统会自动为你安排复习计划</p>
+                </div>
+            </div>
+        </section>
+
         <section id="saved-page" class="page">
             <div class="saved-container">
                 <h1>💾 保存的练习</h1>
@@ -1071,6 +1175,41 @@
 
         <section id="stats-page" class="page">
             <div class="stats-container">
+                <!-- 能力画像雷达图 -->
+                <div class="profile-radar-section">
+                    <h2>🎯 能力画像</h2>
+                    <div class="profile-radar-container">
+                        <div class="profile-radar-left">
+                            <canvas id="profile-radar-chart" width="320" height="320"></canvas>
+                        </div>
+                        <div class="profile-radar-right">
+                            <div class="profile-overall">
+                                <div class="profile-overall-score" id="profile-overall-score">--</div>
+                                <div class="profile-overall-label">综合能力评分</div>
+                            </div>
+                            <div class="profile-dimensions" id="profile-dimensions-list">
+                                <!-- 动态渲染各维度分数 -->
+                            </div>
+                            <div class="profile-stats">
+                                <div class="profile-stat-item">
+                                    <span class="profile-stat-value" id="profile-total-answers">0</span>
+                                    <span class="profile-stat-label">总答题数</span>
+                                </div>
+                                <div class="profile-stat-item">
+                                    <span class="profile-stat-value" id="profile-accuracy">0%</span>
+                                    <span class="profile-stat-label">正确率</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="profile-weak-points" id="profile-weak-points">
+                        <h3>📌 薄弱知识点</h3>
+                        <div class="weak-points-list" id="weak-points-list">
+                            <p class="weak-points-empty">开始练习后将自动分析薄弱知识点</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="diagnosis-panel" id="diagnosis-panel">
                     <h2>🎯 学情诊断</h2>
                     <div class="diagnosis-overview">
@@ -1478,9 +1617,10 @@
             </div>
             <div class="modal-body">
                 <div class="setting-item">
-                    <label>阿里云 API Key</label>
-                    <input type="password" id="api-key" placeholder="输入你的阿里云通义千问 API Key">
-                    <small>用于AI翻译评判功能</small>
+                    <label>AI服务状态</label>
+                    <div style="padding: 10px; background: var(--bg-color, #f0f0f0); border-radius: 8px; font-size: 0.85rem; color: #666;">
+                        ✅ AI功能由后端统一管理，无需配置API Key
+                    </div>
                 </div>
                 <div class="setting-item">
                     <label>每页显示数量</label>
@@ -1489,6 +1629,18 @@
                         <option value="100" selected>100</option>
                         <option value="200">200</option>
                     </select>
+                </div>
+
+                <!-- 自适应难度设置 -->
+                <div class="setting-item">
+                    <label>🎚️ 自适应难度调整</label>
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <small style="color:var(--text-secondary,#888);font-size:0.8rem;">连续答对3题自动提升难度，连续答错2题自动降低难度</small>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="adaptive-difficulty-toggle" onchange="app.toggleAdaptiveDifficulty()" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 主题颜色设置 -->

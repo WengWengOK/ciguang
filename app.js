@@ -17,7 +17,7 @@ const Storage = typeof BackendStorage !== 'undefined' ? BackendStorage : {
     
     getSettings() {
         const data = localStorage.getItem('wordCollection_settings');
-        return data ? JSON.parse(data) : { apiKey: '', pageSize: 100 };
+        return data ? JSON.parse(data) : { pageSize: 100 };
     },
     
     saveSettings(settings) {
@@ -160,6 +160,12 @@ async function handleAuthSubmit() {
             if (window.app) {
                 await window.app.loadWords();
                 window.app.renderCollection();
+                // 加载复习统计（显示首页复习提醒）
+                window.app.loadReviewStats();
+            }
+            // 启动云端数据同步
+            if (typeof BackendStorage !== 'undefined') {
+                BackendStorage.initSync();
             }
         } else {
             errorEl.textContent = result.message;
@@ -172,6 +178,15 @@ async function handleAuthSubmit() {
 }
 
 function logout() {
+    // 停止云端同步定时器
+    if (typeof BackendStorage !== 'undefined' && BackendStorage._syncTimer) {
+        clearInterval(BackendStorage._syncTimer);
+        BackendStorage._syncTimer = null;
+    }
+    // 登出前上传最后一次数据
+    if (typeof BackendStorage !== 'undefined') {
+        BackendStorage.syncToCloud().catch(() => {});
+    }
     api.logout();
     updateAuthUI();
     // 清除本地数据
@@ -742,6 +757,7 @@ class WordCollectionApp {
         
         // 翻译练习状态
         this.translationTopic = 'culture';
+        this.translationDifficulty = 'medium'; // 翻译难度（新增）
         this.currentTranslation = null;
         this.translationInputs = {};
 
@@ -749,6 +765,20 @@ class WordCollectionApp {
         this.clozeDifficulty = 'easy';
         this.currentCloze = null;
         this.clozeAnswers = {};
+
+        // ===== 自适应难度调整系统 =====
+        // 基于最近发展区理论：连续答对3题自动提升难度，连续答错2题自动降低难度
+        this.adaptiveDifficulty = true; // 自适应开关，默认开启
+        this.difficultyStreaks = {
+            reading: 0,
+            cloze: 0,
+            translation: 0,
+            writing: 0,
+            practice: 0
+        };
+        // 难度等级映射
+        this.difficultyLevels = ['easy', 'medium', 'hard'];
+        this.difficultyLabels = { easy: '简单', medium: '中等', hard: '困难' };
 
         // 单词记忆状态
         this.memoryMode = 'all';
@@ -769,6 +799,14 @@ class WordCollectionApp {
 
         // 错题本
         this.wrongRecords = JSON.parse(localStorage.getItem('wrong_records') || '[]');
+
+        // 艾宾浩斯复习会话状态
+        this.reviewQueue = [];
+        this.reviewIndex = 0;
+        this.reviewSessionStats = { correct: 0, wrong: 0, mastered: 0 };
+
+        // OCR分析结果
+        this.ocrAnalysisResult = null;
 
         // 计时器状态
         this.timers = {
@@ -795,6 +833,14 @@ class WordCollectionApp {
         this.renderCollection();
         this.updateTotalCount();
         this.renderSavedExercises();
+        // 从设置中恢复自适应难度开关
+        if (this.settings.adaptiveDifficulty !== undefined) {
+            this.adaptiveDifficulty = this.settings.adaptiveDifficulty;
+        }
+        // 已登录用户加载复习统计（显示首页提醒卡片）
+        if (typeof api !== 'undefined' && api.isLoggedIn()) {
+            this.loadReviewStats();
+        }
     }
     
     initMemory() {
@@ -1619,6 +1665,8 @@ class WordCollectionApp {
         } else if (page === 'wrong') {
             this.renderWrongList();
             this.renderPlatformErrors('all');
+        } else if (page === 'review') {
+            this.initReviewPage();
         } else if (page === 'exam') {
             this.initExamPage();
         } else if (page === 'report') {
@@ -1923,11 +1971,11 @@ class WordCollectionApp {
         try {
             let result;
             
-            if (this.settings.apiKey) {
-                // Use real AI API
+            try {
+                // 通过后端代理调用AI（API Key在后端管理）
                 result = await this.callAIAPI(word, userTranslation);
-            } else {
-                // Use local evaluation
+            } catch (aiErr) {
+                // AI服务不可用时降级到本地评估
                 result = this.localEvaluate(word, userTranslation);
             }
             
@@ -1955,6 +2003,19 @@ class WordCollectionApp {
             
             // Save updated words
             Storage.saveWords(this.words);
+
+            // 同步练习记录到后端（触发能力画像更新 - 词汇维度）
+            this.syncRecordToBackend('practice', {
+                word_id: word.id,
+                user_answer: userTranslation,
+                reference_answer: word.meaning,
+                score: result.score,
+                is_correct: result.score >= 60,
+                mode: 'word_practice'
+            });
+
+            // 自适应难度调整（例句练习）
+            this.adjustDifficulty('practice', result.score >= 60);
             
         } catch (error) {
             evaluationContent.innerHTML = `<div style="color: var(--error);">评判出错: ${error.message}</div>`;
@@ -1997,7 +2058,6 @@ class WordCollectionApp {
     }
     
     async callAIAPI(word, userTranslation) {
-        const apiKey = this.settings.apiKey;
         const example = document.getElementById('example-sentence').textContent;
         
         const prompt = `请评判以下英语单词翻译的准确性，给出0-100分的评分和详细反馈。
@@ -2013,32 +2073,14 @@ class WordCollectionApp {
   "feedback": "详细反馈建议"
 }`;
 
-        const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'qwen-turbo',
-                input: {
-                    messages: [
-                        { role: 'system', content: '你是一个专业的英语翻译评判助手。' },
-                        { role: 'user', content: prompt }
-                    ]
-                },
-                parameters: {
-                    result_format: 'message'
-                }
-            })
-        });
+        // 通过后端代理调用AI（API Key不暴露在前端）
+        const response = await api.callAI(prompt, '你是一个专业的英语翻译评判助手。');
         
-        if (!response.ok) {
-            throw new Error('API请求失败');
+        if (!response.success) {
+            throw new Error(response.message || 'AI请求失败');
         }
         
-        const data = await response.json();
-        const content = data.output?.choices?.[0]?.message?.content || '';
+        const content = response.data.content || '';
         
         // Try to parse JSON from response
         try {
@@ -2815,6 +2857,19 @@ class WordCollectionApp {
             type: correct >= 3 ? 'correct' : 'wrong',
             message: `📖 阅读练习：${this.currentPassage.title}，答对 ${correct}/${questions.length} 题`
         });
+
+        // 同步阅读记录到后端（触发能力画像更新 - 阅读维度）
+        this.syncRecordToBackend('reading', {
+            passage_title: this.currentPassage.title,
+            passage_content: this.currentPassage.content || '',
+            questions: questions.map(q => q.text),
+            answers: questions.map(q => q.options[q.correct]),
+            user_answers: this.readingAnswers.map((idx, i) => 
+                idx !== undefined ? questions[i].options[idx] : '未作答'
+            ),
+            score: score,
+            total_questions: questions.length
+        });
         
         // Show result below the passage (keep article visible)
         document.getElementById('reading-result').style.display = 'block';
@@ -2828,6 +2883,9 @@ class WordCollectionApp {
             userAnswer: r.userAnswer
         }));
         this.showAgentFeedback('reading', score, correct, questions.length, wrongItems);
+
+        // 自适应难度调整
+        this.adjustDifficulty('reading', score / questions.length >= 0.6);
     }
     
     renderReadingResult(score, correct, total, results) {
@@ -3688,6 +3746,17 @@ class WordCollectionApp {
             message: `📝 选词填空：${this.currentCloze.title}，答对 ${correct}/${blanks.length} 空`
         });
 
+        // 同步选词填空记录到后端（触发能力画像更新 - 语法维度）
+        this.syncRecordToBackend('cloze', {
+            passage_title: this.currentCloze.title,
+            passage_content: this.currentCloze.content || '',
+            blanks: blanks.map(b => ({ index: b.index, word: b.word })),
+            user_answers: this.clozeAnswers,
+            correct_answers: blanks.map(b => b.word),
+            score: score,
+            total_blanks: blanks.length
+        });
+
         // Hide card, show result
         document.getElementById('cloze-card').style.display = 'none';
         document.getElementById('cloze-result').style.display = 'block';
@@ -3699,6 +3768,9 @@ class WordCollectionApp {
             userAnswer: r.userAnswer || ''
         }));
         this.showAgentFeedback('cloze', score, correct, blanks.length, clozeWrongItems);
+
+        // 自适应难度调整
+        this.adjustDifficulty('cloze', score / blanks.length >= 0.6);
     }
 
     renderClozeResult(score, correct, total, results) {
@@ -3738,11 +3810,25 @@ class WordCollectionApp {
         
         const materials = this.getTranslationMaterials(this.translationTopic);
         const material = materials[Math.floor(Math.random() * materials.length)];
-        this.currentTranslation = material;
+        
+        // 根据难度筛选句子：easy=短句(<=40字符), medium=中句, hard=长句(>60字符)
+        let sentences = material.sentences;
+        if (this.translationDifficulty === 'easy') {
+            const easy = sentences.filter(s => s.cn.length <= 20 || s.refEn.length <= 50);
+            sentences = easy.length >= 2 ? easy : sentences.slice(0, 2);
+        } else if (this.translationDifficulty === 'hard') {
+            const hard = sentences.filter(s => s.cn.length > 18 || s.refEn.length > 60);
+            sentences = hard.length >= 2 ? hard : sentences.slice(-2);
+        } else {
+            // medium: 取全部或中间部分
+            sentences = sentences.length > 3 ? sentences.slice(0, 3) : sentences;
+        }
+        
+        this.currentTranslation = { ...material, sentences };
         this.translationInputs = {};
         
         this.renderTranslation(material);
-        this.renderTranslationSentences(material);
+        this.renderTranslationSentences(this.currentTranslation);
         
         document.getElementById('translation-result').style.display = 'none';
         document.getElementById('translation-card').style.display = 'block';
@@ -3921,12 +4007,15 @@ class WordCollectionApp {
         const sentences = this.currentTranslation.sentences;
         const results = [];
         
-        // Try AI evaluation first
-        const hasApiKey = this.settings.apiKey && this.settings.apiKey.trim().length > 0;
+        // 难度映射
+        const difficultyMap = { easy: '简单', medium: '中等', hard: '困难' };
+        const currentDiffLabel = difficultyMap[this.translationDifficulty] || '中等';
         
-        if (hasApiKey) {
-            // AI evaluation
-            const prompt = `你是一个英语翻译评分助手。请评判以下中翻英翻译的质量。
+        // 通过后端代理调用AI进行批量翻译评判（API Key在后端管理）
+        const prompt = `你是一个英语翻译评分助手。请评判以下中翻英翻译的质量。
+
+难度等级：${currentDiffLabel}
+（简单难度评分标准相对宽松，困难难度要求更精确的用词和语法结构）
 
 规则：
 1. 每题给出0-100的分数
@@ -3947,23 +4036,12 @@ ${sentences.map((s, idx) => {
 请返回JSON格式：
 {"results": [{"score": 85, "feedback": "语法正确，表达地道", "suggestions": "可以更简洁"}, ...]}`;
 
-            try {
-                const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${this.settings.apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        messages: [{ role: 'user', content: prompt }],
-                        temperature: 0.3,
-                        max_tokens: 1000
-                    })
-                });
-                
-                const data = await response.json();
-                const content = data.choices?.[0]?.message?.content || '';
+        try {
+            // 通过后端代理调用AI
+            const response = await api.callAI(prompt, '你是一个英语翻译评分助手，请严格按照JSON格式返回结果。', { temperature: 0.3, max_tokens: 1000 });
+            
+            if (response.success && response.data && response.data.content) {
+                const content = response.data.content;
                 
                 // Parse AI response
                 const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -3985,12 +4063,12 @@ ${sentences.map((s, idx) => {
                     // Fallback to local evaluation
                     this.localTranslationEval(sentences, results);
                 }
-            } catch (err) {
-                console.error('AI evaluation failed:', err);
+            } else {
+                // Fallback to local evaluation
                 this.localTranslationEval(sentences, results);
             }
-        } else {
-            // Local keyword matching evaluation
+        } catch (err) {
+            console.error('AI evaluation failed:', err);
             this.localTranslationEval(sentences, results);
         }
         
@@ -4021,6 +4099,16 @@ ${sentences.map((s, idx) => {
             type: completed >= 3 ? 'correct' : 'wrong',
             message: `🌐 翻译练习：${this.currentTranslation.title}，均分 ${avgScore}，${completed}/${results.length} 句及格`
         });
+
+        // 同步翻译记录到后端（触发能力画像更新 - 翻译维度）
+        this.syncRecordToBackend('translation', {
+            source_text: sentences.map(s => s.cn).join('\n'),
+            user_translation: this.translationInputs.filter(i => i).join('\n'),
+            reference_translation: sentences.map(s => s.refEn).join('\n'),
+            ai_feedback: results.map(r => r.feedback || '').join('; '),
+            score: avgScore,
+            theme: this.currentTranslation.title
+        });
         
         document.getElementById('translation-card').style.display = 'none';
         document.getElementById('translation-result').style.display = 'block';
@@ -4032,6 +4120,9 @@ ${sentences.map((s, idx) => {
             userAnswer: r.userInput || ''
         }));
         this.showAgentFeedback('translation', avgScore, completed, results.length, transWrongItems);
+
+        // 自适应难度调整
+        this.adjustDifficulty('translation', avgScore >= 60);
     }
     
     localTranslationEval(sentences, results) {
@@ -4529,6 +4620,408 @@ ${sentences.map((s, idx) => {
         return `${minutes}分${remainingSeconds}秒`;
     }
 
+    // ===== 能力画像同步 =====
+    // 将答题记录同步到后端，后端会自动更新能力画像（非阻塞，不影响主流程）
+
+    syncRecordToBackend(type, data) {
+        // 仅在已登录时同步
+        if (typeof api === 'undefined' || !api.isLoggedIn()) return;
+
+        // 非阻塞调用，错误静默处理
+        const syncPromise = (async () => {
+            try {
+                switch (type) {
+                    case 'practice':
+                        await api.savePracticeRecord(data);
+                        break;
+                    case 'reading':
+                        await api.saveReadingRecord(data);
+                        break;
+                    case 'translation':
+                        await api.saveTranslationRecord(data);
+                        break;
+                    case 'cloze':
+                        await api.saveClozeRecord(data);
+                        break;
+                    case 'memory':
+                        await api.saveMemoryRecord(data);
+                        break;
+                }
+            } catch (err) {
+                console.log('记录同步到后端失败（非阻塞）:', err.message);
+            }
+        })();
+
+        return syncPromise;
+    }
+
+    // ===== 自适应难度调整系统 =====
+
+    // 获取模块当前难度
+    getModuleDifficulty(module) {
+        switch (module) {
+            case 'reading':
+                return this.readingDifficulty;
+            case 'cloze':
+                return this.clozeDifficulty;
+            case 'translation':
+                return this.translationDifficulty;
+            case 'writing':
+                return this.currentWritingPrompt?.difficulty || 'medium';
+            case 'practice':
+                return 'medium'; // 例句练习无难度等级，仅用于streak记录
+            default:
+                return 'medium';
+        }
+    }
+
+    // 设置模块难度
+    setModuleDifficulty(module, difficulty) {
+        switch (module) {
+            case 'reading':
+                this.readingDifficulty = difficulty;
+                document.querySelectorAll('[data-reading-mode]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.readingMode === difficulty);
+                });
+                break;
+            case 'cloze':
+                this.clozeDifficulty = difficulty;
+                document.querySelectorAll('[data-cloze-difficulty]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.clozeDifficulty === difficulty);
+                });
+                break;
+            case 'translation':
+                this.translationDifficulty = difficulty;
+                break;
+            case 'writing':
+                if (this.currentWritingPrompt) {
+                    this.currentWritingPrompt.difficulty = difficulty;
+                }
+                const writingSelect = document.getElementById('writing-difficulty');
+                if (writingSelect) writingSelect.value = difficulty;
+                const writingTag = document.getElementById('writing-difficulty-tag');
+                if (writingTag) writingTag.textContent = `难度：${this.difficultyLabels[difficulty]}`;
+                break;
+        }
+    }
+
+    // 核心方法：根据答题结果调整难度
+    adjustDifficulty(module, isCorrect) {
+        // 如果自适应难度关闭，不调整
+        if (!this.adaptiveDifficulty) return;
+
+        // 更新连续计数
+        if (isCorrect) {
+            this.difficultyStreaks[module] = (this.difficultyStreaks[module] || 0) + 1;
+        } else {
+            this.difficultyStreaks[module] = (this.difficultyStreaks[module] || 0) - 1;
+        }
+
+        const streak = this.difficultyStreaks[module];
+        const currentDifficulty = this.getModuleDifficulty(module);
+        const currentLevelIndex = this.difficultyLevels.indexOf(currentDifficulty);
+
+        let newDifficulty = currentDifficulty;
+        let adjusted = false;
+
+        // 连续答对3题 → 提升难度
+        if (streak >= 3 && currentLevelIndex < this.difficultyLevels.length - 1) {
+            newDifficulty = this.difficultyLevels[currentLevelIndex + 1];
+            this.setModuleDifficulty(module, newDifficulty);
+            this.difficultyStreaks[module] = 0;
+            adjusted = true;
+            this.showDifficultyToast(module, newDifficulty, 'up');
+        }
+        // 连续答错2题 → 降低难度
+        else if (streak <= -2 && currentLevelIndex > 0) {
+            newDifficulty = this.difficultyLevels[currentLevelIndex - 1];
+            this.setModuleDifficulty(module, newDifficulty);
+            this.difficultyStreaks[module] = 0;
+            adjusted = true;
+            this.showDifficultyToast(module, newDifficulty, 'down');
+        }
+
+        // 如果已经在最高/最低难度，重置streak避免无限累积
+        if (streak >= 3 || streak <= -2) {
+            this.difficultyStreaks[module] = 0;
+        }
+
+        return adjusted;
+    }
+
+    // 显示难度变化提示
+    showDifficultyToast(module, newDifficulty, direction) {
+        const moduleNames = {
+            reading: '阅读练习',
+            cloze: '选词填空',
+            translation: '翻译练习',
+            writing: '写作练习',
+            practice: '例句练习'
+        };
+        const moduleName = moduleNames[module] || module;
+        const diffLabel = this.difficultyLabels[newDifficulty] || newDifficulty;
+
+        if (direction === 'up') {
+            this.showToast(`🎉 检测到你表现出色，${moduleName}难度已提升至${diffLabel}！`, 3000);
+        } else {
+            this.showToast(`💡 别灰心，${moduleName}难度已调整为${diffLabel}，加油！`, 3000);
+        }
+    }
+
+    // 切换自适应难度开关
+    toggleAdaptiveDifficulty() {
+        this.adaptiveDifficulty = !this.adaptiveDifficulty;
+        // 保存到设置
+        this.settings.adaptiveDifficulty = this.adaptiveDifficulty;
+        Storage.saveSettings(this.settings);
+
+        if (this.adaptiveDifficulty) {
+            this.showToast('✅ 自适应难度已开启，系统将根据你的表现自动调节', 2500);
+        } else {
+            this.showToast('🔒 自适应难度已关闭，难度将保持手动选择', 2500);
+        }
+    }
+
+    // ===== 艾宾浩斯遗忘曲线复习系统 =====
+
+    // 初始化复习页面
+    async initReviewPage() {
+        await this.loadReviewStats();
+    }
+
+    // 加载复习统计
+    async loadReviewStats() {
+        if (typeof api === 'undefined' || !api.isLoggedIn()) {
+            document.getElementById('review-pending-count').textContent = '0';
+            document.getElementById('review-total-count').textContent = '0';
+            document.getElementById('review-mastered-count').textContent = '0';
+            document.getElementById('btn-start-review').disabled = true;
+            return;
+        }
+
+        try {
+            const response = await api.getReviewStats();
+            if (response.success && response.data) {
+                document.getElementById('review-pending-count').textContent = response.data.pending || 0;
+                document.getElementById('review-total-count').textContent = response.data.total || 0;
+                document.getElementById('review-mastered-count').textContent = response.data.mastered || 0;
+
+                const btn = document.getElementById('btn-start-review');
+                btn.disabled = (response.data.pending || 0) === 0;
+
+                // 更新首页复习提醒卡片
+                this.updateReviewReminder(response.data.pending || 0);
+            }
+        } catch (err) {
+            console.log('获取复习统计失败:', err.message);
+        }
+    }
+
+    // 开始复习会话
+    async startReviewSession() {
+        if (typeof api === 'undefined' || !api.isLoggedIn()) {
+            this.showToast('请先登录以使用复习功能', 2500);
+            return;
+        }
+
+        try {
+            const response = await api.getReviewQueue(50);
+            if (response.success && response.data) {
+                const queue = response.data.queue || [];
+                if (queue.length === 0) {
+                    this.showReviewEmpty();
+                    return;
+                }
+
+                this.reviewQueue = queue;
+                this.reviewIndex = 0;
+                this.reviewSessionStats = { correct: 0, wrong: 0, mastered: 0 };
+
+                // 切换到闪卡区域
+                document.getElementById('review-overview').style.display = 'none';
+                document.getElementById('review-flashcard-area').style.display = 'flex';
+                document.getElementById('review-complete').style.display = 'none';
+                document.getElementById('review-empty').style.display = 'none';
+
+                this.renderFlashcard();
+            }
+        } catch (err) {
+            console.error('获取复习队列失败:', err.message);
+            this.showToast('获取复习队列失败，请稍后重试', 2500);
+        }
+    }
+
+    // 渲染当前闪卡
+    renderFlashcard() {
+        if (!this.reviewQueue || this.reviewIndex >= this.reviewQueue.length) {
+            this.showReviewComplete();
+            return;
+        }
+
+        const item = this.reviewQueue[this.reviewIndex];
+        const typeMap = {
+            word: '词汇',
+            practice: '例句练习',
+            reading: '阅读理解',
+            cloze: '选词填空',
+            translation: '翻译练习',
+            memory: '单词记忆'
+        };
+
+        // 更新进度
+        const progress = ((this.reviewIndex + 1) / this.reviewQueue.length) * 100;
+        document.getElementById('review-progress-text').textContent =
+            `${this.reviewIndex + 1} / ${this.reviewQueue.length}`;
+        document.getElementById('review-progress-fill').style.width = progress + '%';
+
+        // 渲染闪卡正面（题目）
+        const typeLabel = typeMap[item.item_type] || '复习';
+        document.getElementById('flashcard-type').textContent = typeLabel;
+
+        // 根据类型显示不同的正面内容
+        let questionText = '';
+        if (item.word) {
+            questionText = item.word;
+        } else if (item.question) {
+            questionText = item.question;
+        } else {
+            questionText = '复习项目';
+        }
+        document.getElementById('flashcard-question').textContent = questionText;
+
+        // 渲染闪卡背面（答案）
+        document.getElementById('flashcard-type-back').textContent = '答案';
+        let answerText = '';
+        if (item.meaning) {
+            answerText = item.meaning;
+        } else if (item.correct_answer) {
+            answerText = item.correct_answer;
+        } else {
+            answerText = '无答案信息';
+        }
+        document.getElementById('flashcard-answer').textContent = answerText;
+
+        // 重置翻面状态
+        document.getElementById('flashcard').classList.remove('flipped');
+    }
+
+    // 翻转闪卡
+    flipFlashcard() {
+        document.getElementById('flashcard').classList.toggle('flipped');
+    }
+
+    // 提交复习结果
+    async submitReviewAnswer(isCorrect) {
+        if (!this.reviewQueue || this.reviewIndex >= this.reviewQueue.length) return;
+
+        const item = this.reviewQueue[this.reviewIndex];
+
+        // 更新统计
+        if (isCorrect) {
+            this.reviewSessionStats.correct++;
+        } else {
+            this.reviewSessionStats.wrong++;
+        }
+
+        // 提交到后端（非阻塞）
+        if (typeof api !== 'undefined' && api.isLoggedIn()) {
+            api.submitReview(item.id, isCorrect).then(response => {
+                if (response.success && response.data?.isMastered) {
+                    this.reviewSessionStats.mastered++;
+                }
+            }).catch(err => {
+                console.log('提交复习结果失败（非阻塞）:', err.message);
+            });
+        }
+
+        // 进入下一张
+        this.reviewIndex++;
+        if (this.reviewIndex >= this.reviewQueue.length) {
+            this.showReviewComplete();
+        } else {
+            this.renderFlashcard();
+        }
+    }
+
+    // 显示复习完成
+    showReviewComplete() {
+        document.getElementById('review-flashcard-area').style.display = 'none';
+        document.getElementById('review-complete').style.display = 'block';
+
+        const stats = this.reviewSessionStats || { correct: 0, wrong: 0, mastered: 0 };
+        const total = stats.correct + stats.wrong;
+        const rate = total > 0 ? Math.round((stats.correct / total) * 100) : 0;
+
+        document.getElementById('review-complete-stats').innerHTML = `
+            <div>✅ 答对：${stats.correct} 题</div>
+            <div>❌ 答错：${stats.wrong} 题</div>
+            <div>📊 正确率：${rate}%</div>
+            ${stats.mastered > 0 ? `<div>🎓 新掌握：${stats.mastered} 个</div>` : ''}
+        `;
+    }
+
+    // 显示空状态
+    showReviewEmpty() {
+        document.getElementById('review-overview').style.display = 'none';
+        document.getElementById('review-flashcard-area').style.display = 'none';
+        document.getElementById('review-complete').style.display = 'none';
+        document.getElementById('review-empty').style.display = 'block';
+    }
+
+    // 返回复习概览
+    async showReviewOverview() {
+        document.getElementById('review-flashcard-area').style.display = 'none';
+        document.getElementById('review-complete').style.display = 'none';
+        document.getElementById('review-empty').style.display = 'none';
+        document.getElementById('review-overview').style.display = 'block';
+        await this.loadReviewStats();
+    }
+
+    // 退出复习会话（中途退出）
+    async exitReviewSession() {
+        this.reviewQueue = [];
+        this.reviewIndex = 0;
+        await this.showReviewOverview();
+    }
+
+    // 更新首页复习提醒卡片
+    updateReviewReminder(pendingCount) {
+        let reminder = document.getElementById('review-reminder-card');
+        if (pendingCount > 0) {
+            if (!reminder) {
+                // 动态创建提醒卡片
+                reminder = document.createElement('div');
+                reminder.id = 'review-reminder-card';
+                reminder.className = 'review-reminder-card';
+                reminder.onclick = () => this.switchPage('review');
+                const collectionPage = document.getElementById('collection-page');
+                if (collectionPage) {
+                    collectionPage.insertBefore(reminder, collectionPage.firstChild);
+                }
+            }
+            reminder.innerHTML = `
+                <div class="review-reminder-icon">🔄</div>
+                <div class="review-reminder-content">
+                    <div class="review-reminder-title">今日复习提醒</div>
+                    <div class="review-reminder-desc">基于艾宾浩斯遗忘曲线，有单词需要复习了</div>
+                </div>
+                <div class="review-reminder-badge">${pendingCount}</div>
+            `;
+            reminder.style.display = 'flex';
+        } else if (reminder) {
+            reminder.style.display = 'none';
+        }
+    }
+
+    // 添加错题到复习队列（答题错误时调用）
+    addToReviewQueue(item) {
+        if (typeof api === 'undefined' || !api.isLoggedIn()) return;
+
+        api.addReviewItem(item).catch(err => {
+            console.log('添加复习项目失败（非阻塞）:', err.message);
+        });
+    }
+
     // ===== 错题本功能 =====
 
     // 记录错题
@@ -4543,6 +5036,16 @@ ${sentences.map((s, idx) => {
         if (!recent) {
             this.wrongRecords.push(record);
             this.saveWrongRecords();
+
+            // 同步到艾宾浩斯复习队列
+            this.addToReviewQueue({
+                item_type: record.type || 'word',
+                word: record.word || '',
+                meaning: record.meaning || '',
+                question: record.question || '',
+                correct_answer: record.correctAnswer || '',
+                user_answer: record.userAnswer || ''
+            });
         }
     }
 
@@ -4787,7 +5290,15 @@ ${sentences.map((s, idx) => {
         document.getElementById('photo-error-form').style.display = 'none';
         document.getElementById('wrong-file-preview').style.display = 'none';
         document.getElementById('wrong-file-zone').style.display = 'flex';
+        // 清除OCR状态
+        const ocrLoading = document.getElementById('ocr-loading');
+        const ocrResult = document.getElementById('ocr-result');
+        if (ocrLoading) ocrLoading.style.display = 'none';
+        if (ocrResult) ocrResult.style.display = 'none';
+        const questionField = document.getElementById('photo-error-question');
+        if (questionField) questionField.value = '';
         this.wrongCapturedImage = null;
+        this.ocrAnalysisResult = null;
     }
 
     startWrongCamera() {
@@ -4844,6 +5355,214 @@ ${sentences.map((s, idx) => {
         document.getElementById('btn-wrong-camera-retake').style.display = 'none';
         document.getElementById('btn-wrong-camera-confirm').style.display = 'none';
         document.getElementById('photo-error-form').style.display = 'block';
+        // 自动触发OCR + AI归因分析
+        this.analyzePhotoWithAI();
+    }
+
+    // OCR + AI归因分析
+    async analyzePhotoWithAI() {
+        if (!this.wrongCapturedImage) return;
+
+        const loadingEl = document.getElementById('ocr-loading');
+        const resultEl = document.getElementById('ocr-result');
+        const resultBody = document.getElementById('ocr-result-body');
+
+        // 显示加载中
+        loadingEl.style.display = 'flex';
+        resultEl.style.display = 'none';
+
+        try {
+            const response = await api.analyzeErrorImage(this.wrongCapturedImage);
+
+            if (response.success && response.data) {
+                const data = response.data;
+                this.ocrAnalysisResult = data;
+                this.renderOcrResult(data);
+            } else {
+                // AI服务不可用，显示提示但允许手动填写
+                resultBody.innerHTML = `
+                    <div class="ocr-fallback">
+                        <p>⚠️ ${response.message || 'AI识别服务暂不可用'}</p>
+                        <p class="ocr-fallback-hint">请手动填写错题信息</p>
+                    </div>
+                `;
+                resultEl.style.display = 'block';
+            }
+        } catch (err) {
+            console.error('OCR分析失败:', err.message);
+            resultBody.innerHTML = `
+                <div class="ocr-fallback">
+                    <p>⚠️ 识别失败：${err.message}</p>
+                    <p class="ocr-fallback-hint">请手动填写错题信息</p>
+                </div>
+            `;
+            resultEl.style.display = 'block';
+        } finally {
+            loadingEl.style.display = 'none';
+        }
+    }
+
+    // 渲染OCR分析结果
+    renderOcrResult(data) {
+        const resultBody = document.getElementById('ocr-result-body');
+        const resultEl = document.getElementById('ocr-result');
+
+        const categoryMap = {
+            vocabulary: '词汇不足',
+            grammar: '语法混淆',
+            logic: '逻辑误判',
+            knowledge: '知识点遗漏',
+            other: '其他'
+        };
+
+        const typeMap = {
+            vocabulary: 'practice',
+            grammar: 'practice',
+            reading: 'reading',
+            translation: 'translation',
+            cloze: 'cloze',
+            other: 'photo'
+        };
+
+        // 自动填充表单
+        if (data.questionType && typeMap[data.questionType]) {
+            document.getElementById('photo-error-type').value = typeMap[data.questionType];
+        }
+        if (data.knowledgePoints && data.knowledgePoints.length > 0) {
+            document.getElementById('photo-error-word').value = data.knowledgePoints.join(' / ');
+        }
+        if (data.questionContent) {
+            document.getElementById('photo-error-question').value = data.questionContent;
+        }
+        if (data.errorAnalysis) {
+            const existingNote = document.getElementById('photo-error-note').value;
+            const noteText = `【AI归因】${data.errorAnalysis}`;
+            if (data.improvementSuggestion) {
+                document.getElementById('photo-error-note').value =
+                    `${noteText}\n【建议】${data.improvementSuggestion}${existingNote ? '\n' + existingNote : ''}`;
+            } else {
+                document.getElementById('photo-error-note').value =
+                    `${noteText}${existingNote ? '\n' + existingNote : ''}`;
+            }
+        }
+
+        // 渲染结果展示
+        let html = '';
+
+        // OCR识别文本
+        if (data.ocrText) {
+            html += `
+                <div class="ocr-section">
+                    <div class="ocr-section-title">📝 识别文本</div>
+                    <div class="ocr-section-content ocr-text">${this.escapeHtml(data.ocrText)}</div>
+                </div>
+            `;
+        }
+
+        // 错误归因
+        if (data.errorCategory) {
+            html += `
+                <div class="ocr-section">
+                    <div class="ocr-section-title">🎯 错误归因</div>
+                    <div class="ocr-section-content">
+                        <span class="ocr-tag ocr-tag-${data.errorCategory}">${categoryMap[data.errorCategory] || data.errorCategory}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 知识点
+        if (data.knowledgePoints && data.knowledgePoints.length > 0) {
+            html += `
+                <div class="ocr-section">
+                    <div class="ocr-section-title">📚 涉及知识点</div>
+                    <div class="ocr-section-content">
+                        ${data.knowledgePoints.map(kp => `<span class="ocr-knowledge-tag">${this.escapeHtml(kp)}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 错误分析
+        if (data.errorAnalysis) {
+            html += `
+                <div class="ocr-section">
+                    <div class="ocr-section-title">🔍 错误分析</div>
+                    <div class="ocr-section-content">${this.escapeHtml(data.errorAnalysis)}</div>
+                </div>
+            `;
+        }
+
+        // 改进建议
+        if (data.improvementSuggestion) {
+            html += `
+                <div class="ocr-section">
+                    <div class="ocr-section-title">💡 改进建议</div>
+                    <div class="ocr-section-content">${this.escapeHtml(data.improvementSuggestion)}</div>
+                </div>
+            `;
+        }
+
+        // 变体题
+        if (data.variantQuestions && data.variantQuestions.length > 0) {
+            html += `
+                <div class="ocr-section">
+                    <div class="ocr-section-title">📝 同类变体题（已自动保存到练习推荐）</div>
+                    <div class="ocr-variant-list">
+            `;
+            data.variantQuestions.forEach((q, i) => {
+                html += `
+                    <div class="ocr-variant-item">
+                        <div class="ocr-variant-question">Q${i + 1}. ${this.escapeHtml(q.question)}</div>
+                        ${q.options ? q.options.map((opt, j) => `
+                            <div class="ocr-variant-option ${j === q.answer ? 'correct' : ''}">
+                                ${String.fromCharCode(65 + j)}. ${this.escapeHtml(opt)}${j === q.answer ? ' ✓' : ''}
+                            </div>
+                        `).join('') : ''}
+                        ${q.explanation ? `<div class="ocr-variant-explanation">解析：${this.escapeHtml(q.explanation)}</div>` : ''}
+                    </div>
+                `;
+            });
+            html += `</div></div>`;
+        }
+
+        resultBody.innerHTML = html;
+        resultEl.style.display = 'block';
+
+        // 保存变体题到练习推荐
+        if (data.variantQuestions && data.variantQuestions.length > 0) {
+            this.saveVariantQuestions(data.variantQuestions);
+        }
+    }
+
+    // 重新识别
+    reAnalyzePhoto() {
+        document.getElementById('ocr-result').style.display = 'none';
+        this.analyzePhotoWithAI();
+    }
+
+    // 保存变体题到本地练习推荐
+    saveVariantQuestions(questions) {
+        let saved = JSON.parse(localStorage.getItem('variant_questions') || '[]');
+        questions.forEach(q => {
+            saved.push({
+                ...q,
+                id: Date.now() + Math.random(),
+                createdAt: new Date().toISOString(),
+                practiced: false
+            });
+        });
+        // 保留最近50道
+        if (saved.length > 50) saved = saved.slice(-50);
+        localStorage.setItem('variant_questions', JSON.stringify(saved));
+    }
+
+    // HTML转义
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     stopWrongCamera() {
@@ -4882,6 +5601,8 @@ ${sentences.map((s, idx) => {
                 preview.style.display = 'block';
                 document.getElementById('wrong-file-zone').style.display = 'none';
                 document.getElementById('photo-error-form').style.display = 'block';
+                // 自动触发OCR + AI归因分析
+                this.analyzePhotoWithAI();
             };
             img.src = dataUrl;
         };
@@ -4897,23 +5618,30 @@ ${sentences.map((s, idx) => {
         const type = document.getElementById('photo-error-type').value;
         const word = document.getElementById('photo-error-word').value.trim();
         const note = document.getElementById('photo-error-note').value.trim();
+        const question = document.getElementById('photo-error-question')?.value.trim() || '';
+        const ocrData = this.ocrAnalysisResult || {};
 
         const record = {
             type: type === 'photo' ? 'photo' : type,
             word: word || '拍照错题',
             meaning: '',
-            question: '',
-            correctAnswer: '',
-            userAnswer: '',
+            question: question || ocrData.questionContent || '',
+            correctAnswer: ocrData.correctAnswer || '',
+            userAnswer: ocrData.userAnswer || '',
             image: this.wrongCapturedImage,
             note: note || '',
-            source: 'photo'
+            source: 'photo',
+            ocrText: ocrData.ocrText || '',
+            errorCategory: ocrData.errorCategory || '',
+            knowledgePoints: ocrData.knowledgePoints || []
         };
 
         this.addWrongRecord(record);
+        // 清除OCR分析结果
+        this.ocrAnalysisResult = null;
         this.closePhotoUploadModal();
         this.renderWrongList();
-        this.showWrongToast('✅ 错题已保存');
+        this.showWrongToast('✅ 错题已保存，AI归因分析已记录');
     }
 
     // ===== 手动添加错题 =====
@@ -5082,6 +5810,197 @@ ${sentences.map((s, idx) => {
                 `;
             }).join('');
         }
+
+        // 渲染能力画像雷达图
+        this.renderProfileRadar();
+    }
+
+    // ===== 能力画像雷达图 =====
+    async renderProfileRadar() {
+        const canvas = document.getElementById('profile-radar-chart');
+        if (!canvas) return;
+
+        // 如果未登录，显示默认画像
+        if (typeof api === 'undefined' || !api.isLoggedIn()) {
+            this.drawRadarChart(canvas, { vocabulary: 50, grammar: 50, reading: 50, translation: 50, writing: 50 });
+            document.getElementById('profile-overall-score').textContent = '50';
+            this.renderProfileDimensions({ vocabulary: 50, grammar: 50, reading: 50, translation: 50, writing: 50 });
+            return;
+        }
+
+        try {
+            const response = await api.getProfile();
+            if (response.success && response.data) {
+                const data = response.data;
+                const dims = data.dimensions;
+
+                // 绘制雷达图
+                this.drawRadarChart(canvas, dims);
+
+                // 更新综合评分
+                document.getElementById('profile-overall-score').textContent = data.overallScore;
+
+                // 渲染各维度分数条
+                this.renderProfileDimensions(dims);
+
+                // 渲染统计
+                document.getElementById('profile-total-answers').textContent = data.totalAnswers;
+                document.getElementById('profile-accuracy').textContent = `${data.accuracy}%`;
+
+                // 渲染薄弱知识点
+                this.renderWeakPoints(data.weakPoints || []);
+            }
+        } catch (err) {
+            console.log('获取能力画像失败，使用默认值:', err.message);
+            this.drawRadarChart(canvas, { vocabulary: 50, grammar: 50, reading: 50, translation: 50, writing: 50 });
+        }
+    }
+
+    drawRadarChart(canvas, dimensions) {
+        const ctx = canvas.getContext('2d');
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const radius = Math.min(cx, cy) - 40;
+
+        const labels = ['词汇量', '语法掌握', '阅读理解', '翻译能力', '写作水平'];
+        const keys = ['vocabulary', 'grammar', 'reading', 'translation', 'writing'];
+        const values = keys.map(k => dimensions[k] || 0);
+        const n = labels.length;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 绘制背景网格（5层）
+        for (let level = 5; level >= 1; level--) {
+            const r = (radius / 5) * level;
+            ctx.beginPath();
+            for (let i = 0; i <= n; i++) {
+                const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+                const x = cx + Math.cos(angle) * r;
+                const y = cy + Math.sin(angle) * r;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = level === 5 ? 'rgba(108, 92, 231, 0.3)' : 'rgba(200, 200, 200, 0.2)';
+            ctx.lineWidth = level === 5 ? 1.5 : 1;
+            ctx.stroke();
+        }
+
+        // 绘制轴线
+        for (let i = 0; i < n; i++) {
+            const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // 绘制数据区域
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+            const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+            const r = (values[i] / 100) * radius;
+            const x = cx + Math.cos(angle) * r;
+            const y = cy + Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+
+        // 填充渐变
+        const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        gradient.addColorStop(0, 'rgba(108, 92, 231, 0.3)');
+        gradient.addColorStop(1, 'rgba(108, 92, 231, 0.1)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(108, 92, 231, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 绘制数据点
+        for (let i = 0; i < n; i++) {
+            const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+            const r = (values[i] / 100) * radius;
+            const x = cx + Math.cos(angle) * r;
+            const y = cy + Math.sin(angle) * r;
+
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#6c5ce7';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // 绘制标签
+        ctx.font = '13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let i = 0; i < n; i++) {
+            const angle = (Math.PI * 2 / n) * i - Math.PI / 2;
+            const labelR = radius + 25;
+            const x = cx + Math.cos(angle) * labelR;
+            const y = cy + Math.sin(angle) * labelR;
+
+            ctx.fillStyle = '#666';
+            ctx.fillText(labels[i], x, y);
+
+            // 在标签下方显示分数
+            ctx.fillStyle = '#6c5ce7';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillText(values[i].toString(), x, y + 16);
+            ctx.font = '13px sans-serif';
+        }
+    }
+
+    renderProfileDimensions(dims) {
+        const container = document.getElementById('profile-dimensions-list');
+        if (!container) return;
+
+        const items = [
+            { key: 'vocabulary', label: '词汇量', color: '#6c5ce7' },
+            { key: 'grammar', label: '语法掌握', color: '#00b894' },
+            { key: 'reading', label: '阅读理解', color: '#0984e3' },
+            { key: 'translation', label: '翻译能力', color: '#e17055' },
+            { key: 'writing', label: '写作水平', color: '#fdcb6e' }
+        ];
+
+        container.innerHTML = items.map(item => {
+            const score = dims[item.key] || 0;
+            return `
+                <div class="profile-dimension-item">
+                    <span class="profile-dimension-label">${item.label}</span>
+                    <div class="profile-dimension-bar">
+                        <div class="profile-dimension-fill" style="width: ${score}%; background: ${item.color}"></div>
+                    </div>
+                    <span class="profile-dimension-score">${score}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderWeakPoints(weakPoints) {
+        const container = document.getElementById('weak-points-list');
+        if (!container) return;
+
+        if (!weakPoints || weakPoints.length === 0) {
+            container.innerHTML = '<p class="weak-points-empty">暂无薄弱知识点，继续练习后将自动分析</p>';
+            return;
+        }
+
+        container.innerHTML = weakPoints.map(wp => {
+            return `
+                <div class="weak-point-item">
+                    <span class="weak-point-dimension">${wp.dimensionLabel || wp.dimension}</span>
+                    <span class="weak-point-name">${wp.skillPoint}</span>
+                    <span class="weak-point-accuracy">${wp.accuracy}%</span>
+                </div>
+            `;
+        }).join('');
     }
 
     // ===== 学情诊断 =====
@@ -5177,8 +6096,12 @@ ${sentences.map((s, idx) => {
     // ===== 设置功能 =====
     openSettings() {
         const settings = Storage.getSettings();
-        document.getElementById('api-key').value = settings.apiKey || '';
         document.getElementById('page-size').value = settings.pageSize || 100;
+        // 恢复自适应难度开关状态
+        const adaptiveToggle = document.getElementById('adaptive-difficulty-toggle');
+        if (adaptiveToggle) {
+            adaptiveToggle.checked = this.adaptiveDifficulty;
+        }
         document.getElementById('settings-modal').style.display = 'flex';
         this.renderThemePresets();
         this.loadCurrentThemeColors();
@@ -5217,10 +6140,9 @@ ${sentences.map((s, idx) => {
     }
     
     saveSettings() {
-        const apiKey = document.getElementById('api-key').value.trim();
         const pageSize = parseInt(document.getElementById('page-size').value);
         
-        this.settings = { apiKey, pageSize };
+        this.settings = { ...this.settings, pageSize, adaptiveDifficulty: this.adaptiveDifficulty };
         Storage.saveSettings(this.settings);
         
         document.getElementById('settings-modal').style.display = 'none';
@@ -5614,6 +6536,13 @@ ${sentences.map((s, idx) => {
                 </div>
             `;
         }
+
+        // 同步单词记忆记录到后端（触发能力画像更新 - 词汇维度）
+        this.syncRecordToBackend('memory', {
+            word_id: word.id,
+            word: word.word,
+            is_remembered: isCorrect
+        });
     }
 
     checkMeaningMatch(userMeaning, correctMeaning) {
@@ -6096,33 +7025,30 @@ ${sentences.map((s, idx) => {
         }
         // 不再限制字数，允许任意长度的文章
 
-        // 优先尝试AI生成高质量阅读理解题目
-        const apiKey = this.settings.apiKey;
-        if (apiKey) {
+        // 优先通过后端代理调用AI生成高质量阅读理解题目
+        try {
             this.showLoading('AI正在分析文章并生成阅读理解题目...');
-            try {
-                const passage = await this.callAICustomReading(text);
-                this.currentPassage = passage;
-                this.readingAnswers = {};
-                this.readingCurrentQuestion = 0;
+            const passage = await this.callAICustomReading(text);
+            this.currentPassage = passage;
+            this.readingAnswers = {};
+            this.readingCurrentQuestion = 0;
 
-                this.renderPassage(passage);
-                this.renderQuestions(passage.questions);
+            this.renderPassage(passage);
+            this.renderQuestions(passage.questions);
 
-                document.getElementById('reading-result').style.display = 'none';
-                document.getElementById('reading-card').style.display = 'block';
-                document.getElementById('reading-source-switch').style.display = 'none';
-                document.querySelectorAll('.reading-nav-item').forEach(item => {
-                    item.classList.remove('nav-correct', 'nav-wrong');
-                });
+            document.getElementById('reading-result').style.display = 'none';
+            document.getElementById('reading-card').style.display = 'block';
+            document.getElementById('reading-source-switch').style.display = 'none';
+            document.querySelectorAll('.reading-nav-item').forEach(item => {
+                item.classList.remove('nav-correct', 'nav-wrong');
+            });
 
-                this.startTimer('reading');
-                this.hideLoading();
-                return;
-            } catch (err) {
-                console.error('AI生成阅读理解题目失败，使用本地模板:', err);
-                this.hideLoading();
-            }
+            this.startTimer('reading');
+            this.hideLoading();
+            return;
+        } catch (err) {
+            console.error('AI生成阅读理解题目失败，使用本地模板:', err);
+            this.hideLoading();
         }
 
         // 回退：将用户文本解析为passage对象（本地模板）
@@ -6152,7 +7078,6 @@ ${sentences.map((s, idx) => {
      * 使用qwen-turbo模型，返回与本地模板相同格式的passage对象
      */
     async callAICustomReading(text) {
-        const apiKey = this.settings.apiKey;
         const difficulty = this.readingDifficulty || 'easy';
         const difficultyMap = { easy: '简单', medium: '中等', hard: '困难' };
 
@@ -6188,32 +7113,14 @@ ${text}
 7. 干扰项要有合理性，不能明显错误
 8. 题目和选项必须基于文章内容，不能凭空编造`;
 
-        const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'qwen-turbo',
-                input: {
-                    messages: [
-                        { role: 'system', content: '你是考研英语阅读理解出题专家，擅长根据文章内容设计高质量的阅读理解题目。你返回的结果必须是纯JSON格式。' },
-                        { role: 'user', content: prompt }
-                    ]
-                },
-                parameters: {
-                    result_format: 'message'
-                }
-            })
-        });
+        // 通过后端代理调用AI（API Key不暴露在前端）
+        const response = await api.callAI(prompt, '你是考研英语阅读理解出题专家，擅长根据文章内容设计高质量的阅读理解题目。你返回的结果必须是纯JSON格式。');
 
-        if (!response.ok) {
-            throw new Error('AI API请求失败');
+        if (!response.success) {
+            throw new Error(response.message || 'AI请求失败');
         }
 
-        const data = await response.json();
-        const content = data.output?.choices?.[0]?.message?.content || '';
+        const content = response.data.content || '';
 
         // 解析JSON
         const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -8005,16 +8912,6 @@ WordCollectionApp.prototype.analyzeReadingMistakes = async function() {
 }
 
 WordCollectionApp.prototype.analyzeSingleMistake = async function(question, userAnswer, correctAnswer, passage) {
-    const apiKey = this.settings.apiKey;
-    if (!apiKey) {
-        return {
-            errorType: '理解偏差',
-            knowledgePoint: '阅读理解',
-            reason: '未配置API密钥，使用默认分析',
-            suggestion: '建议仔细阅读文章，定位关键信息'
-        };
-    }
-
     const prompt = `你是一位考研英语阅读辅导专家。请分析以下错题，指出错误原因并给出改进建议。
 
 文章片段：
@@ -8034,41 +8931,23 @@ ${passage.substring(0, 1500)}
 }`;
 
     try {
-        const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'qwen-turbo',
-                input: {
-                    messages: [
-                        { role: 'system', content: '你是考研英语阅读理解专家，擅长分析学生错题并提供针对性建议。' },
-                        { role: 'user', content: prompt }
-                    ]
-                },
-                parameters: {
-                    result_format: 'message'
-                }
-            })
-        });
+        // 通过后端代理调用AI
+        const response = await api.callAI(prompt, '你是考研英语阅读理解专家，擅长分析学生错题并提供针对性建议。');
 
-        if (!response.ok) throw new Error('API请求失败');
+        if (response.success && response.data && response.data.content) {
+            const content = response.data.content;
 
-        const data = await response.json();
-        const content = data.output?.choices?.[0]?.message?.content || '';
-
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            const result = JSON.parse(jsonMatch[0]);
-            return {
-                errorType: result.errorType || '理解偏差',
-                knowledgePoint: result.knowledgePoint || '阅读理解',
-                reason: result.reason || '未能准确理解题意',
-                suggestion: result.suggestion || '建议多做同类题型练习',
-                keySentence: result.keySentence || ''
-            };
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const result = JSON.parse(jsonMatch[0]);
+                return {
+                    errorType: result.errorType || '理解偏差',
+                    knowledgePoint: result.knowledgePoint || '阅读理解',
+                    reason: result.reason || '未能准确理解题意',
+                    suggestion: result.suggestion || '建议多做同类题型练习',
+                    keySentence: result.keySentence || ''
+                };
+            }
         }
     } catch (e) {
         console.error('AI分析单题失败:', e);
@@ -8179,6 +9058,9 @@ WordCollectionApp.prototype.submitWritingWithAIGrade = async function() {
             userAnswer: ''
         }] : [];
         this.showAgentFeedback('writing', writingScore, writingCorrect, 1, writingWrongItems);
+
+        // 自适应难度调整
+        this.adjustDifficulty('writing', writingScore >= 60);
     } catch (err) {
         console.error('AI作文评分失败:', err);
         alert('评分失败，请检查API配置或稍后重试');
@@ -8188,8 +9070,6 @@ WordCollectionApp.prototype.submitWritingWithAIGrade = async function() {
 }
 
 WordCollectionApp.prototype.callAIWritingGrade = async function(topic, essay, wordCount, difficulty) {
-    const apiKey = this.settings.apiKey;
-
     // 如果有后端agentClient，优先使用后端
     if (typeof agentClient !== 'undefined' && agentClient.evaluateWriting) {
         try {
@@ -8213,12 +9093,8 @@ WordCollectionApp.prototype.callAIWritingGrade = async function(topic, essay, wo
                 };
             }
         } catch (e) {
-            console.log('后端评分失败，尝试直接调用AI API');
+            console.log('后端评分失败，尝试通过AI代理调用');
         }
-    }
-
-    if (!apiKey) {
-        throw new Error('未配置API密钥');
     }
 
     const difficultyDesc = { easy: '简单', medium: '中等', hard: '困难' };
@@ -8251,30 +9127,12 @@ ${essay}
   "improvedVersion": "改进后的作文全文"
 }`;
 
-    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'qwen-turbo',
-            input: {
-                messages: [
-                    { role: 'system', content: '你是考研英语作文评分专家，严格按照评分标准给出公正评分和建设性意见。' },
-                    { role: 'user', content: prompt }
-                ]
-            },
-            parameters: {
-                result_format: 'message'
-            }
-        })
-    });
+    // 通过后端代理调用AI（API Key不暴露在前端）
+    const response = await api.callAI(prompt, '你是考研英语作文评分专家，严格按照评分标准给出公正评分和建设性意见。');
 
-    if (!response.ok) throw new Error('API请求失败');
+    if (!response.success) throw new Error(response.message || 'AI请求失败');
 
-    const data = await response.json();
-    const content = data.output?.choices?.[0]?.message?.content || '';
+    const content = response.data.content || '';
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -9119,8 +9977,8 @@ WordCollectionApp.prototype.analyzeWrongPatterns = async function() {
         const analysis = this.localAnalyzeWrongPatterns(wrongRecords);
 
         // 如果有API密钥，调用AI进行更深入分析
-        const apiKey = this.settings.apiKey;
-        if (apiKey && wrongRecords.length >= 3) {
+        // 通过后端代理调用AI分析错题规律
+        if (wrongRecords.length >= 3) {
             try {
                 const aiAnalysis = await this.callAIWrongPatternAnalysis(wrongRecords, analysis);
                 analysis.aiSuggestions = aiAnalysis.suggestions || [];
@@ -9224,9 +10082,6 @@ WordCollectionApp.prototype.generateLocalSuggestions = function(typeStats, error
 }
 
 WordCollectionApp.prototype.callAIWrongPatternAnalysis = async function(wrongRecords, localAnalysis) {
-    const apiKey = this.settings.apiKey;
-    if (!apiKey) throw new Error('未配置API密钥');
-
     const prompt = `你是一位考研英语学习顾问。请根据以下学生的错题数据，分析其学习规律并给出针对性建议。
 
 错题统计：
@@ -9244,30 +10099,12 @@ WordCollectionApp.prototype.callAIWrongPatternAnalysis = async function(wrongRec
   "studyPlan": "一周学习计划概要（中文，100字以内）"
 }`;
 
-    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'qwen-turbo',
-            input: {
-                messages: [
-                    { role: 'system', content: '你是考研英语学习顾问，擅长分析学生错题规律并制定针对性学习计划。' },
-                    { role: 'user', content: prompt }
-                ]
-            },
-            parameters: {
-                result_format: 'message'
-            }
-        })
-    });
+    // 通过后端代理调用AI
+    const response = await api.callAI(prompt, '你是考研英语学习顾问，擅长分析学生错题规律并制定针对性学习计划。');
 
-    if (!response.ok) throw new Error('API请求失败');
+    if (!response.success) throw new Error(response.message || 'AI请求失败');
 
-    const data = await response.json();
-    const content = data.output?.choices?.[0]?.message?.content || '';
+    const content = response.data.content || '';
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -10707,16 +11544,8 @@ WordCollectionApp.prototype.examStartAnalysis = async function() {
  * 使用 qwen-vl-plus 视觉语言模型
  */
 WordCollectionApp.prototype.callExamAnalysisAPI = async function() {
-    const apiKey = this.settings.apiKey;
-    if (!apiKey) {
-        throw new Error('未设置API Key');
-    }
-
     // 构建多模态消息内容
-    const content = [];
-    this.examImages.forEach(img => {
-        content.push({ image: img });
-    });
+    const images = [...this.examImages];
 
     const prompt = `你是一个专业的英语试卷分析助手。请仔细分析上传的试卷图片，识别试卷中的题目、答案和得分情况。
 
@@ -10754,32 +11583,14 @@ WordCollectionApp.prototype.callExamAnalysisAPI = async function() {
 5. advice 给出3-5条具体可执行的建议
 6. 如果图片不清晰，请根据可见内容尽力分析`;
 
-    content.push({ text: prompt });
+    // 通过后端多模态代理调用AI（API Key不暴露在前端）
+    const response = await api.callAIMultimodal(prompt, images);
 
-    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'qwen-vl-plus',
-            input: {
-                messages: [
-                    { role: 'user', content: content }
-                ]
-            }
-        })
-    });
-
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`API请求失败: ${response.status} ${errText}`);
+    if (!response.success) {
+        throw new Error(response.message || 'AI多模态请求失败');
     }
 
-    const data = await response.json();
-    const responseText = data.output?.choices?.[0]?.message?.content ||
-                         data.output?.text || '';
+    const responseText = response.data.content || '';
 
     // 从返回文本中提取JSON
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -11759,15 +12570,6 @@ WordCollectionApp.prototype.reportAIDeepAnalysis = async function() {
     const container = document.getElementById('report-ai-advice');
     container.innerHTML = '<div class="report-ai-loading">✨ AI 正在深度分析你的学习数据...</div>';
 
-    const apiKey = this.settings.apiKey;
-    if (!apiKey) {
-        // 本地生成建议
-        const localAdvice = this.generateLocalReportAdvice(this.reportData);
-        this.renderReportAIAdvice(localAdvice);
-        this.showExamToast('未设置API Key，已使用本地分析');
-        return;
-    }
-
     try {
         const report = this.reportData;
         const prompt = `你是一位专业的英语学习诊断专家。请根据以下学生的学习数据，给出个性化的深度分析和建议。
@@ -11785,27 +12587,11 @@ ${report.examResult ? '- 试卷分析得分：' + (report.examResult.overview?.s
 
 以JSON数组格式返回：[{"title":"...","content":"...","priority":"..."}]`;
 
-        const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'qwen-turbo',
-                input: {
-                    messages: [
-                        { role: 'system', content: '你是一位专业的英语学习诊断专家，擅长分析学生数据并给出针对性建议。' },
-                        { role: 'user', content: prompt }
-                    ]
-                },
-                parameters: { result_format: 'message' }
-            })
-        });
+        // 通过后端代理调用AI
+        const response = await api.callAI(prompt, '你是一位专业的英语学习诊断专家，擅长分析学生数据并给出针对性建议。');
 
-        if (!response.ok) throw new Error('API请求失败');
-        const data = await response.json();
-        const content = data.output?.choices?.[0]?.message?.content || '';
+        if (!response.success) throw new Error(response.message || 'AI请求失败');
+        const content = response.data.content || '';
 
         const jsonMatch = content.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
@@ -11988,4 +12774,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAuthUI();
     // 初始化设置按钮外观
     setTimeout(() => window.app.initSettingsBtnAppearance(), 500);
+    // 如果已登录，启动云端数据同步
+    if (typeof api !== 'undefined' && api.isLoggedIn() && typeof BackendStorage !== 'undefined') {
+        BackendStorage.initSync();
+    }
 });

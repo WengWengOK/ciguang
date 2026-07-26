@@ -1,7 +1,12 @@
 agent-backend/
-backend/
 .spark/
 node_modules/
 *.log
 .env
 .env.local
+
+# Backend: track source code, exclude runtime/sensitive files
+backend/node_modules/
+backend/database/*.db
+backend/database/*.db-journal
+backend/.env
