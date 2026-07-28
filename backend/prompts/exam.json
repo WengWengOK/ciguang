@@ -1,0 +1,66 @@
+{
+  "name": "真题生成",
+  "description": "考研英语真题命题专家，根据题型（完形填空/阅读理解/新题型/翻译/写作）和难度生成模拟真题，含题目、选项、答案和解析",
+  "source": "routes/exam-practice.js - POST /api/exam-practice/generate (buildExamPrompt)",
+  "system_prompt": "",
+  "user_prompt_template": "你是考研英语命题专家。请生成一份{{difficultyLabel}}的考研英语{{sectionName}}题目。{{topicHint}}\n\n{{sectionRequirements}}\n\n注意：JSON格式必须严格正确，不要有多余文本。所有内容用中文和英文混合（题目英文，解析中文）。",
+  "variables": [
+    {
+      "name": "difficultyLabel",
+      "description": "难度标签，可选值：基础难度（略低于考研难度）、标准考研难度、考研冲刺难度（偏难）",
+      "required": true
+    },
+    {
+      "name": "sectionName",
+      "description": "题型名称，如：完形填空、阅读理解Part A、新题型Part B、翻译Part C、应用文写作、图表/图画作文",
+      "required": true
+    },
+    {
+      "name": "topicHint",
+      "description": "话题方向提示，若指定话题则为'话题方向：xxx。'，否则为'话题不限，但应符合考研英语常见话题（社会、科技、教育、文化、经济等）。'",
+      "required": true
+    },
+    {
+      "name": "sectionRequirements",
+      "description": "根据题型从 section_templates 中选取对应的要求和JSON格式",
+      "required": true
+    }
+  ],
+  "section_templates": {
+    "cloze": {
+      "name": "完形填空",
+      "requirements": "要求：\n1. 提供一篇约250-300词的英语文章，挖空20处\n2. 每空4个选项(A/B/C/D)\n3. 考查词汇辨析、语法结构、上下文逻辑\n\nJSON格式返回：\n{\n  \"passage\": \"文章全文，空格处用[1][2]...[20]标记\",\n  \"translation\": \"文章中文翻译\",\n  \"questions\": [\n    {\"index\": 1, \"options\": {\"A\":\"选项A\",\"B\":\"选项B\",\"C\":\"选项C\",\"D\":\"选项D\"}, \"correctAnswer\": \"A\", \"explanation\": \"解析\"}\n  ]\n}"
+    },
+    "reading_a": {
+      "name": "阅读理解Part A",
+      "requirements": "要求：\n1. 提供1篇约400-500词的英语阅读文章\n2. 配5道单选题（每题4个选项）\n3. 考查主旨、细节、推理、词义等\n\nJSON格式返回：\n{\n  \"passage\": \"文章全文\",\n  \"title\": \"文章标题\",\n  \"translation\": \"文章中文翻译\",\n  \"questions\": [\n    {\"index\": 1, \"stem\": \"题干\", \"options\": {\"A\":\"A\",\"B\":\"B\",\"C\":\"C\",\"D\":\"D\"}, \"correctAnswer\": \"A\", \"explanation\": \"解析\"}\n  ]\n}"
+    },
+    "reading_b": {
+      "name": "新题型Part B",
+      "requirements": "要求：\n1. 提供1篇约500词的英语文章，部分段落被挖出\n2. 从6-7个备选段落中选择5个填入空白处\n3. 考查文章结构、逻辑连贯\n\nJSON格式返回：\n{\n  \"passage\": \"文章全文，空白处用[1][2][3][4][5]标记\",\n  \"title\": \"文章标题\",\n  \"translation\": \"文章中文翻译\",\n  \"options\": [{\"label\":\"A\",\"content\":\"段落内容\"}, {\"label\":\"B\",\"content\":\"段落内容\"}, {\"label\":\"C\",\"content\":\"段落内容\"}, {\"label\":\"D\",\"content\":\"段落内容\"}, {\"label\":\"E\",\"content\":\"段落内容\"}, {\"label\":\"F\",\"content\":\"段落内容(干扰项1)\"}, {\"label\":\"G\",\"content\":\"段落内容(干扰项2)\"}],\n  \"correctOrder\": [\"A\",\"C\",\"E\",\"B\",\"D\"],\n  \"explanations\": \"各题解析\"\n}"
+    },
+    "reading_c": {
+      "name": "翻译Part C",
+      "requirements": "要求：\n1. 提供1篇约400词的英语文章\n2. 划出5个句子要求翻译为中文\n3. 考查长难句理解和翻译技巧\n\nJSON格式返回：\n{\n  \"passage\": \"文章全文，需翻译的句子用①②③④⑤标记\",\n  \"title\": \"文章标题\",\n  \"translation\": \"全文参考翻译\",\n  \"sentences\": [\n    {\"index\": 1, \"original\": \"需翻译的英文句子\", \"reference\": \"参考翻译\", \"explanation\": \"翻译要点解析\"}\n  ]\n}"
+    },
+    "writing_a": {
+      "name": "应用文写作",
+      "requirements": "要求：\n1. 提供一个应用文写作题目（如信件、通知、便条等）\n2. 字数要求约100词\n3. 提供写作要点和参考范文\n\nJSON格式返回：\n{\n  \"prompt\": \"写作题目和要求\",\n  \"scenario\": \"情景描述\",\n  \"requirements\": [\"要求1\", \"要求2\", \"要求3\"],\n  \"referenceEssay\": \"参考范文\",\n  \"tips\": [\"写作技巧1\", \"写作技巧2\"],\n  \"keyPhrases\": [\"常用句型1\", \"常用句型2\"]\n}"
+    },
+    "writing_b": {
+      "name": "图表/图画作文",
+      "requirements": "要求：\n1. 提供一个图表或图画作文题目\n2. 字数要求约150-200词\n3. 提供写作框架和参考范文\n\nJSON格式返回：\n{\n  \"prompt\": \"写作题目\",\n  \"chartDescription\": \"图表/图画描述\",\n  \"requirements\": [\"要求1\", \"要求2\", \"要求3\"],\n  \"outline\": [\"第一段：描述图表\", \"第二段：分析原因\", \"第三段：总结展望\"],\n  \"referenceEssay\": \"参考范文\",\n  \"tips\": [\"写作技巧1\", \"写作技巧2\"],\n  \"keyPhrases\": [\"高频句型1\", \"高频句型2\"]\n}"
+    }
+  },
+  "difficulty_map": {
+    "easy": "基础难度（略低于考研难度）",
+    "medium": "标准考研难度",
+    "hard": "考研冲刺难度（偏难）"
+  },
+  "params": {
+    "temperature": 0.7,
+    "max_tokens": 3000,
+    "model": "qwen-turbo"
+  },
+  "output_format": "JSON: 题型相关结构，含 passage/translation/questions 等字段"
+}

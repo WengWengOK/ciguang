@@ -808,6 +808,26 @@ class WordCollectionApp {
         // OCR分析结果
         this.ocrAnalysisResult = null;
 
+        // AI口语练习状态
+        this.speakingCategory = 'self_intro';
+        this.speakingCurrentTopic = null;
+        this.speakingMediaRecorder = null;
+        this.speakingAudioChunks = [];
+        this.speakingAudioBlob = null;
+        this.speakingAudioUrl = null;
+        this.speakingStream = null;
+        this.speakingTimer = null;
+        this.speakingStartTime = 0;
+        this.speakingDuration = 0;
+        this.speakingRecognition = null;
+        this.speakingTranscription = '';
+        this.speakingIsRecording = false;
+
+        // AI学习导师状态
+        this.tutorSessionId = null;
+        this.tutorPanelOpen = false;
+        this.tutorIsSending = false;
+
         // 计时器状态
         this.timers = {
             practice: { start: null, elapsed: 0 },
@@ -841,6 +861,8 @@ class WordCollectionApp {
         if (typeof api !== 'undefined' && api.isLoggedIn()) {
             this.loadReviewStats();
         }
+        // 初始化首页
+        this.switchPage('home');
     }
     
     initMemory() {
@@ -899,10 +921,12 @@ class WordCollectionApp {
     }
     
     setupEventListeners() {
-        // Navigation tabs
+        // Navigation tabs (main categories)
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
+                const category = e.currentTarget.dataset.category;
                 const page = e.currentTarget.dataset.page;
+                // 主标签点击：导航到该分类的默认页面
                 this.switchPage(page);
             });
         });
@@ -1401,6 +1425,16 @@ class WordCollectionApp {
                 const tab = e.currentTarget.dataset.wrongTab;
                 document.getElementById(`wrong-${tab}-content`).classList.add('active');
                 if (tab === 'platform') this.renderPlatformErrors('all');
+                if (tab === 'analysis') this.renderErrorAnalysisDashboard();
+            });
+        });
+
+        // 掌握状态筛选按钮
+        document.querySelectorAll('.wrong-filter-mastery').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.wrong-filter-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.renderWrongList(e.target.dataset.filter);
             });
         });
 
@@ -1617,27 +1651,111 @@ class WordCollectionApp {
         });
     }
     
+    // 页面分类映射
+    static PAGE_CATEGORY_MAP = {
+        home: 'home',
+        practice: 'practice', reading: 'practice', translation: 'practice',
+        cloze: 'practice', writing: 'practice', speaking: 'practice', memory: 'practice',
+        'exam-practice': 'practice',
+        review: 'review', wrong: 'review', saved: 'review',
+        stats: 'insights', prediction: 'insights', report: 'insights', exam: 'insights',
+        collection: 'collection'
+    };
+
+    static CATEGORY_SUBTABS = {
+        home: [],
+        practice: [
+            { page: 'practice', label: '例句练习', icon: '✏️' },
+            { page: 'reading', label: '阅读理解', icon: '📖' },
+            { page: 'translation', label: '翻译练习', icon: '🌐' },
+            { page: 'cloze', label: '选词填空', icon: '📝' },
+            { page: 'writing', label: '作文练习', icon: '✍️' },
+            { page: 'speaking', label: '口语练习', icon: '🗣️' },
+            { page: 'memory', label: '记忆训练', icon: '🧠' },
+            { page: 'exam-practice', label: '真题练习', icon: '📋' },
+        ],
+        review: [
+            { page: 'review', label: '艾宾浩斯复习', icon: '🔄' },
+            { page: 'wrong', label: '错题整理', icon: '❌' },
+            { page: 'saved', label: '已保存', icon: '💾' },
+        ],
+        insights: [
+            { page: 'stats', label: '学习统计', icon: '📊' },
+            { page: 'prediction', label: '学情预测', icon: '🎯' },
+            { page: 'report', label: '学习报告', icon: '📑' },
+            { page: 'exam', label: '试卷分析', icon: '📋' },
+        ],
+        collection: []
+    };
+
+    static CATEGORY_DEFAULT_PAGE = {
+        home: 'home',
+        practice: 'practice',
+        review: 'review',
+        insights: 'stats',
+        collection: 'collection'
+    };
+
     switchPage(page) {
-        // Update nav tabs
+        // 处理分类名作为参数（如 onclick="app.switchPage('insights')"）
+        if (WordCollectionApp.CATEGORY_DEFAULT_PAGE[page] && !document.getElementById(`${page}-page`)) {
+            page = WordCollectionApp.CATEGORY_DEFAULT_PAGE[page];
+        }
+
+        // 获取页面所属分类
+        const category = WordCollectionApp.PAGE_CATEGORY_MAP[page] || 'home';
+
+        // 1. 更新主导航高亮
         document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.page === page);
+            tab.classList.toggle('active', tab.dataset.category === category);
         });
-        
-        // Update pages
+
+        // 2. 渲染子导航
+        this.renderSubtabs(category, page);
+
+        // 3. 更新页面显示
         document.querySelectorAll('.page').forEach(p => {
             p.classList.toggle('active', p.id === `${page}-page`);
         });
-        
-        // Reset nav tabs scroll to keep first items visible
-        const navTabs = document.querySelector('.nav-tabs');
-        if (navTabs) {
-            navTabs.scrollLeft = 0;
-        }
-        
+
         this.currentPage = page;
-        
-        // Page-specific initialization
-        if (page === 'practice') {
+
+        // 4. 页面特定初始化
+        this.initPageContent(page);
+    }
+
+    /**
+     * 渲染二级子导航
+     */
+    renderSubtabs(category, activePage) {
+        const subtabsContainer = document.getElementById('nav-subtabs');
+        if (!subtabsContainer) return;
+
+        const subtabs = WordCollectionApp.CATEGORY_SUBTABS[category] || [];
+
+        if (subtabs.length === 0) {
+            subtabsContainer.classList.add('hidden');
+            subtabsContainer.innerHTML = '';
+            return;
+        }
+
+        subtabsContainer.classList.remove('hidden');
+        subtabsContainer.innerHTML = subtabs.map(tab => `
+            <button class="nav-subtab ${tab.page === activePage ? 'active' : ''}" 
+                    data-page="${tab.page}"
+                    onclick="app.switchPage('${tab.page}')">
+                <span>${tab.icon}</span> ${tab.label}
+            </button>
+        `).join('');
+    }
+
+    /**
+     * 页面内容初始化
+     */
+    initPageContent(page) {
+        if (page === 'home') {
+            this.initHomePage();
+        } else if (page === 'practice') {
             this.nextPracticeWord();
         } else if (page === 'reading') {
             if (!this.currentPassage) {
@@ -1671,6 +1789,185 @@ class WordCollectionApp {
             this.initExamPage();
         } else if (page === 'report') {
             this.initReportPage();
+        } else if (page === 'speaking') {
+            this.initSpeakingPage();
+        } else if (page === 'prediction') {
+            this.initPredictionPage();
+        } else if (page === 'exam-practice') {
+            this.initExamPracticePage();
+        }
+    }
+
+    /**
+     * 初始化学习中心首页
+     */
+    async initHomePage() {
+        // 更新欢迎语和日期
+        const now = new Date();
+        const hour = now.getHours();
+        let greeting = '👋 欢迎';
+        if (api.isLoggedIn()) {
+            const nickname = document.getElementById('user-nickname')?.textContent || '同学';
+            if (hour < 6) greeting = `🌙 夜深了，${nickname}注意休息`;
+            else if (hour < 12) greeting = `🌅 早上好，${nickname}`;
+            else if (hour < 18) greeting = `☀️ 下午好，${nickname}`;
+            else greeting = `🌆 晚上好，${nickname}`;
+        }
+        document.getElementById('welcome-title').textContent = greeting;
+
+        const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 · ${weekDays[now.getDay()]}`;
+        document.getElementById('welcome-date').textContent = dateStr;
+
+        // 并行加载首页数据
+        this.loadHomeStats();
+        this.loadHomeReviewReminder();
+        this.loadHomeProfile();
+    }
+
+    /**
+     * 加载首页统计数据
+     */
+    async loadHomeStats() {
+        const todayCountEl = document.getElementById('home-today-count');
+        const reviewCountEl = document.getElementById('home-review-count');
+        const streakEl = document.getElementById('home-streak');
+        const predictEl = document.getElementById('home-predict-score');
+
+        if (!api.isLoggedIn()) {
+            if (todayCountEl) todayCountEl.textContent = '0';
+            if (reviewCountEl) reviewCountEl.textContent = '0';
+            if (streakEl) streakEl.textContent = '0';
+            if (predictEl) predictEl.textContent = '--';
+            return;
+        }
+
+        try {
+            // 获取复习队列统计
+            const reviewResponse = await api.getReviewStats();
+            if (reviewResponse.success && reviewResponse.data) {
+                if (reviewCountEl) reviewCountEl.textContent = reviewResponse.data.pending || 0;
+            }
+        } catch (err) {
+            console.log('复习统计加载失败');
+        }
+
+        try {
+            // 获取学情预测
+            const forecastResponse = await api.predictForecast();
+            if (forecastResponse.success && forecastResponse.data) {
+                if (forecastResponse.data.hasData !== false) {
+                    if (predictEl) predictEl.textContent = forecastResponse.data.scoreRange?.predicted || '--';
+                    if (streakEl) streakEl.textContent = forecastResponse.data.streakDays || 0;
+
+                    // 从daily_stats获取今日答题数
+                    const today = new Date().toISOString().split('T')[0];
+                    if (forecastResponse.data.trendData && forecastResponse.data.trendData.length > 0) {
+                        const todayData = forecastResponse.data.trendData.find(d => d.date === today);
+                        if (todayData && todayCountEl) {
+                            todayCountEl.textContent = todayData.total;
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.log('预测数据加载失败');
+        }
+    }
+
+    /**
+     * 加载首页复习提醒
+     */
+    async loadHomeReviewReminder() {
+        const container = document.getElementById('home-review-reminder');
+        if (!container) return;
+
+        if (!api.isLoggedIn()) {
+            container.innerHTML = `
+                <div class="reminder-empty">
+                    <p>🔐 登录后开启智能复习</p>
+                    <p class="reminder-empty-desc">基于艾宾浩斯遗忘曲线，科学安排复习</p>
+                </div>
+            `;
+            return;
+        }
+
+        try {
+            const response = await api.getReviewQueue(5);
+            if (response.success && response.data) {
+                const items = response.data.items || response.data || [];
+                if (items.length === 0) {
+                    container.innerHTML = `
+                        <div class="reminder-empty">
+                            <p>✅ 暂无待复习内容</p>
+                            <p class="reminder-empty-desc">继续练习，错题会自动加入复习队列</p>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = items.slice(0, 4).map(item => `
+                        <div class="reminder-item" onclick="app.switchPage('review')">
+                            <span class="reminder-item-type">${item.item_type === 'word' ? '🔤' : item.item_type === 'error' ? '❌' : '📝'}</span>
+                            <span class="reminder-item-text">${item.word || item.question || '复习项目'}</span>
+                            <span class="reminder-item-count">${item.review_count || 0}次</span>
+                        </div>
+                    `).join('') + `
+                        <button class="reminder-go-btn" onclick="app.switchPage('review')">查看全部 →</button>
+                    `;
+                }
+            }
+        } catch (err) {
+            container.innerHTML = '<div class="reminder-empty"><p>复习数据加载中...</p></div>';
+        }
+    }
+
+    /**
+     * 加载首页能力画像摘要
+     */
+    async loadHomeProfile() {
+        const container = document.getElementById('home-profile-mini');
+        if (!container) return;
+
+        const dimLabels = { vocabulary: '词汇', grammar: '语法', reading: '阅读', translation: '翻译', writing: '写作' };
+        const dims = { vocabulary: 50, grammar: 50, reading: 50, translation: 50, writing: 50 };
+
+        if (!api.isLoggedIn()) {
+            container.innerHTML = `
+                <div class="reminder-empty">
+                    <p>🔐 登录后查看能力画像</p>
+                    <p class="reminder-empty-desc">5维度能力分析 · 个性化提升建议</p>
+                </div>
+            `;
+            return;
+        }
+
+        try {
+            const response = await api.getProfile();
+            if (response.success && response.data) {
+                const data = response.data;
+                const dimensions = data.dimensions || dims;
+                const overall = data.overallScore || 50;
+
+                container.innerHTML = `
+                    <div class="profile-mini-score">
+                        <div class="mini-score-circle">${overall}</div>
+                        <div class="mini-score-label">综合得分</div>
+                    </div>
+                    <div class="profile-mini-bars">
+                        ${Object.entries(dimensions).map(([key, val]) => `
+                            <div class="mini-bar-row">
+                                <span class="mini-bar-label">${dimLabels[key]}</span>
+                                <div class="mini-bar-track">
+                                    <div class="mini-bar-fill" style="width: ${val}%"></div>
+                                </div>
+                                <span class="mini-bar-value">${val}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="reminder-go-btn" onclick="app.switchPage('prediction')">查看详情 →</button>
+                `;
+            }
+        } catch (err) {
+            container.innerHTML = '<div class="reminder-empty"><p>画像数据加载中...</p></div>';
         }
     }
     
@@ -5073,7 +5370,31 @@ ${sentences.map((s, idx) => {
     // 渲染错题列表
     renderWrongList(filter = 'all') {
         const list = document.getElementById('wrong-list');
-        let filtered = filter === 'all' ? this.wrongRecords : this.wrongRecords.filter(r => r.type === filter);
+        this.wrongCurrentFilter = filter;
+
+        let filtered = this.wrongRecords;
+
+        // 类型/掌握状态筛选
+        if (filter !== 'all') {
+            if (['unmastered', 'reviewing', 'mastered'].includes(filter)) {
+                filtered = filtered.filter(r => (r.mastery || 'unmastered') === filter);
+            } else {
+                filtered = filtered.filter(r => r.type === filter);
+            }
+        }
+
+        // 搜索关键词筛选
+        if (this.wrongSearchKeyword) {
+            const kw = this.wrongSearchKeyword.toLowerCase();
+            filtered = filtered.filter(r => {
+                return (r.word && r.word.toLowerCase().includes(kw)) ||
+                       (r.meaning && r.meaning.toLowerCase().includes(kw)) ||
+                       (r.question && r.question.toLowerCase().includes(kw)) ||
+                       (r.correctAnswer && String(r.correctAnswer).toLowerCase().includes(kw)) ||
+                       (r.userAnswer && String(r.userAnswer).toLowerCase().includes(kw)) ||
+                       (r.note && r.note.toLowerCase().includes(kw));
+            });
+        }
 
         // 更新统计数据
         document.getElementById('wrong-total').textContent = this.wrongRecords.length;
@@ -5085,16 +5406,30 @@ ${sentences.map((s, idx) => {
         if (photoCountEl) photoCountEl.textContent = this.wrongRecords.filter(r => r.type === 'photo' || r.image).length;
 
         if (filtered.length === 0) {
-            list.innerHTML = '<div class="wrong-empty"><div class="empty-icon">🎉</div><p>暂无错题，继续保持！</p></div>';
+            const emptyMsg = this.wrongSearchKeyword ? '没有找到匹配的错题' : '暂无错题，继续保持！';
+            list.innerHTML = `<div class="wrong-empty"><div class="empty-icon">🎉</div><p>${emptyMsg}</p></div>`;
             return;
         }
 
         const typeMap = {practice: '例句练习', reading: '阅读练习', cloze: '选词填空', memory: '单词记忆', photo: '📷 拍照错题', translation: '翻译练习'};
+        const masteryMap = {
+            unmastered: {label: '未掌握', class: 'mastery-unmastered', icon: '🔴'},
+            reviewing: {label: '复习中', class: 'mastery-reviewing', icon: '🟡'},
+            mastered: {label: '已掌握', class: 'mastery-mastered', icon: '🟢'}
+        };
+        const batchMode = this.wrongBatchMode || false;
 
-        list.innerHTML = filtered.map(record => `
-            <div class="wrong-item" data-id="${record.id}">
+        list.innerHTML = filtered.map(record => {
+            const m = masteryMap[record.mastery || 'unmastered'];
+            return `
+            <div class="wrong-item wrong-item-${record.mastery || 'unmastered'}" data-id="${record.id}">
+                ${batchMode ? `<input type="checkbox" class="wrong-batch-checkbox" data-id="${record.id}" onchange="app.updateBatchSelection()">` : ''}
                 <div class="wrong-item-header">
-                    <span class="wrong-item-type ${record.type}">${typeMap[record.type] || record.type}</span>
+                    <div class="wrong-item-tags">
+                        <span class="wrong-item-type ${record.type}">${typeMap[record.type] || record.type}</span>
+                        <span class="wrong-item-mastery ${m.class}">${m.icon} ${m.label}</span>
+                        ${record.aiAnalysis?.errorType ? `<span class="wrong-item-ai-tag">${record.aiAnalysis.errorType}</span>` : ''}
+                    </div>
                     <span class="wrong-item-time">${new Date(record.createdAt).toLocaleString('zh-CN')}</span>
                 </div>
                 ${record.word ? `<div class="wrong-item-word">${record.word}</div>` : ''}
@@ -5104,12 +5439,19 @@ ${sentences.map((s, idx) => {
                 ${record.userAnswer ? `<div class="wrong-item-user-answer">你的答案：${record.userAnswer}</div>` : ''}
                 ${record.image ? `<div class="wrong-item-photo" onclick="app.viewImage('${record.id}')"><img src="${record.image}" alt="错题图片"></div>` : ''}
                 ${record.note ? `<div class="wrong-item-note">📝 ${record.note}</div>` : ''}
+                ${record.aiAnalysis?.reason ? `<div class="wrong-item-ai-reason">🤖 ${record.aiAnalysis.reason}</div>` : ''}
+                ${record.aiAnalysis?.suggestion ? `<div class="wrong-item-ai-suggestion">💡 ${record.aiAnalysis.suggestion}</div>` : ''}
                 <div class="wrong-item-actions">
                     ${record.type !== 'photo' ? `<button onclick="app.practiceWrongItem('${record.id}')">🔄 重新练习</button>` : ''}
+                    <button class="btn-mastery-toggle" onclick="app.cycleMasteryStatus('${record.id}')">${m.icon} 切换状态</button>
                     <button class="btn-remove" onclick="app.removeWrongRecord('${record.id}')">❌ 移除</button>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
+
+        // 如果批量模式开启，恢复选中状态
+        if (batchMode) this.restoreBatchSelection();
     }
 
     // 重新练习错题
@@ -12765,6 +13107,2663 @@ WordCollectionApp.prototype.exportErrorCollection = function() {
     link.click();
     URL.revokeObjectURL(url);
     this.showExamToast('错题集已导出');
+};
+
+// ===== AI口语练习模块 =====
+
+/**
+ * 初始化口语练习页面
+ */
+WordCollectionApp.prototype.initSpeakingPage = function() {
+    // 绑定分类切换
+    document.querySelectorAll('.speaking-cat-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.speaking-cat-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            this.speakingCategory = btn.dataset.speakingCat;
+        };
+    });
+
+    // 检查浏览器是否支持语音识别
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        // 不支持语音识别，显示文本输入降级
+        const fallback = document.getElementById('speaking-fallback-input');
+        if (fallback) {
+            fallback.querySelector('.speaking-fallback-hint p').textContent =
+                '⚠️ 当前浏览器不支持语音识别，请直接打字回答：';
+        }
+    }
+};
+
+/**
+ * 生成口语话题
+ */
+WordCollectionApp.prototype.generateSpeakingTopic = async function() {
+    const btn = document.getElementById('btn-generate-topic');
+    const card = document.getElementById('speaking-topic-card');
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ 生成中...';
+    }
+
+    if (card) {
+        card.innerHTML = `
+            <div class="speaking-topic-placeholder">
+                <span class="speaking-topic-icon">⏳</span>
+                <p>AI正在生成话题...</p>
+            </div>
+        `;
+    }
+
+    try {
+        const response = await api.generateSpeakingTopic(this.speakingCategory);
+
+        if (response.success && response.data) {
+            this.speakingCurrentTopic = response.data;
+            this.renderSpeakingTopic(response.data);
+
+            // 显示录音区域
+            document.getElementById('speaking-record-section').style.display = 'block';
+            document.getElementById('speaking-result-section').style.display = 'none';
+
+            // 重置录音状态
+            this.resetSpeakingState();
+        } else {
+            if (card) {
+                card.innerHTML = `
+                    <div class="speaking-topic-placeholder">
+                        <span class="speaking-topic-icon">⚠️</span>
+                        <p>${response.message || '生成失败，请重试'}</p>
+                    </div>
+                `;
+            }
+        }
+    } catch (err) {
+        console.error('生成口语话题失败:', err);
+        if (card) {
+            card.innerHTML = `
+                <div class="speaking-topic-placeholder">
+                    <span class="speaking-topic-icon">⚠️</span>
+                    <p>网络错误，请重试</p>
+                </div>
+            `;
+        }
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🎲 生成话题';
+        }
+    }
+};
+
+/**
+ * 渲染口语话题
+ */
+WordCollectionApp.prototype.renderSpeakingTopic = function(data) {
+    const card = document.getElementById('speaking-topic-card');
+    if (!card) return;
+
+    const categoryLabels = {
+        self_intro: '👤 自我介绍',
+        social: '🌍 社会话题',
+        academic: '🎓 学术讨论',
+        daily: '🏠 日常生活',
+        career: '💼 职业规划'
+    };
+
+    card.innerHTML = `
+        <div class="speaking-topic-content">
+            <div class="speaking-topic-meta">
+                <span class="speaking-cat-badge">${categoryLabels[data.category] || '🎤 口语话题'}</span>
+                ${data.estimatedTime ? `<span class="speaking-time-badge">⏱️ ${data.estimatedTime}</span>` : ''}
+                ${data.fallback ? '<span class="speaking-fallback-badge">📦 预设话题</span>' : '<span class="speaking-ai-badge">🤖 AI生成</span>'}
+            </div>
+            <div class="speaking-topic-text">${data.topic || '未获取到话题'}</div>
+            ${data.tips ? `<div class="speaking-topic-tips">💡 ${data.tips}</div>` : ''}
+        </div>
+    `;
+};
+
+/**
+ * 开始录音
+ */
+WordCollectionApp.prototype.startSpeakingRecording = async function() {
+    try {
+        // 获取麦克风权限
+        this.speakingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // 初始化MediaRecorder
+        this.speakingAudioChunks = [];
+        const options = { mimeType: 'audio/webm' };
+        this.speakingMediaRecorder = new MediaRecorder(this.speakingStream, options);
+
+        // 初始化语音识别（如果支持）
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            this.speakingRecognition = new SpeechRecognition();
+            this.speakingRecognition.lang = 'en-US';
+            this.speakingRecognition.continuous = true;
+            this.speakingRecognition.interimResults = true;
+
+            this.speakingTranscription = '';
+
+            this.speakingRecognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    this.speakingTranscription += finalTranscript;
+                }
+
+                // 实时显示转写结果
+                const textEl = document.getElementById('transcription-text');
+                const transEl = document.getElementById('speaking-transcription');
+                if (textEl && transEl) {
+                    transEl.style.display = 'block';
+                    textEl.textContent = this.speakingTranscription + interimTranscript;
+                }
+            };
+
+            this.speakingRecognition.onerror = (event) => {
+                console.error('语音识别错误:', event.error);
+            };
+
+            this.speakingRecognition.start();
+        }
+
+        // 录音数据收集
+        this.speakingMediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                this.speakingAudioChunks.push(event.data);
+            }
+        };
+
+        // 录音结束
+        this.speakingMediaRecorder.onstop = () => {
+            this.speakingAudioBlob = new Blob(this.speakingAudioChunks, { type: 'audio/webm' });
+            this.speakingAudioUrl = URL.createObjectURL(this.speakingAudioBlob);
+        };
+
+        // 开始录音
+        this.speakingMediaRecorder.start();
+        this.speakingIsRecording = true;
+        this.speakingStartTime = Date.now();
+
+        // 更新UI
+        document.getElementById('btn-record-start').style.display = 'none';
+        document.getElementById('btn-record-stop').style.display = 'inline-block';
+        document.getElementById('speaking-waveform').style.display = 'flex';
+        document.getElementById('speaking-transcription').style.display = 'block';
+        document.getElementById('speaking-evaluating').style.display = 'none';
+
+        // 启动计时器
+        this.speakingTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - this.speakingStartTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            const timerEl = document.getElementById('speaking-timer');
+            if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+        }, 1000);
+
+    } catch (err) {
+        console.error('无法访问麦克风:', err);
+        alert('无法访问麦克风，请检查浏览器权限设置。您也可以使用下方文本输入框直接打字回答。');
+        // 显示文本输入
+        document.getElementById('speaking-fallback-input').style.display = 'block';
+    }
+};
+
+/**
+ * 停止录音
+ */
+WordCollectionApp.prototype.stopSpeakingRecording = function() {
+    if (this.speakingMediaRecorder && this.speakingIsRecording) {
+        this.speakingMediaRecorder.stop();
+        this.speakingIsRecording = false;
+    }
+
+    // 停止语音识别
+    if (this.speakingRecognition) {
+        try {
+            this.speakingRecognition.stop();
+        } catch (e) {
+            console.log('语音识别已停止');
+        }
+    }
+
+    // 停止计时器
+    if (this.speakingTimer) {
+        clearInterval(this.speakingTimer);
+        this.speakingDuration = Math.floor((Date.now() - this.speakingStartTime) / 1000);
+        this.speakingTimer = null;
+    }
+
+    // 停止麦克风
+    if (this.speakingStream) {
+        this.speakingStream.getTracks().forEach(track => track.stop());
+    }
+
+    // 更新UI
+    document.getElementById('btn-record-stop').style.display = 'none';
+    document.getElementById('speaking-waveform').style.display = 'none';
+    document.getElementById('btn-record-play').style.display = 'inline-block';
+    document.getElementById('btn-submit-speaking').style.display = 'inline-block';
+
+    // 显示转写结果
+    const textEl = document.getElementById('transcription-text');
+    if (textEl && this.speakingTranscription) {
+        textEl.textContent = this.speakingTranscription;
+    } else if (textEl) {
+        textEl.textContent = '（未识别到语音内容，请使用文本输入）';
+        document.getElementById('speaking-fallback-input').style.display = 'block';
+    }
+};
+
+/**
+ * 播放录音
+ */
+WordCollectionApp.prototype.playSpeakingRecording = function() {
+    if (this.speakingAudioUrl) {
+        const audio = new Audio(this.speakingAudioUrl);
+        audio.play();
+    }
+};
+
+/**
+ * 提交口语回答（语音转文字后AI评判）
+ */
+WordCollectionApp.prototype.submitSpeakingAnswer = async function() {
+    const transcription = this.speakingTranscription || '';
+
+    if (!transcription || transcription.trim().length < 5) {
+        alert('语音识别内容过少，请使用文本输入框补充您的回答。');
+        document.getElementById('speaking-fallback-input').style.display = 'block';
+        return;
+    }
+
+    await this.evaluateSpeaking(transcription, this.speakingDuration);
+};
+
+/**
+ * 提交文本回答（降级方案）
+ */
+WordCollectionApp.prototype.submitSpeakingText = async function() {
+    const text = document.getElementById('speaking-text-input').value.trim();
+
+    if (!text || text.length < 5) {
+        alert('请输入您的英文回答（至少5个字符）');
+        return;
+    }
+
+    await this.evaluateSpeaking(text, this.speakingDuration || 120);
+};
+
+/**
+ * 调用AI评判口语
+ */
+WordCollectionApp.prototype.evaluateSpeaking = async function(transcription, duration) {
+    const evaluatingEl = document.getElementById('speaking-evaluating');
+    const resultSection = document.getElementById('speaking-result-section');
+
+    if (evaluatingEl) evaluatingEl.style.display = 'flex';
+    if (resultSection) resultSection.style.display = 'none';
+
+    // 隐藏录音区
+    document.getElementById('btn-submit-speaking').style.display = 'none';
+    document.getElementById('btn-record-play').style.display = 'none';
+
+    try {
+        const response = await api.evaluateSpeaking(
+            this.speakingCurrentTopic?.topic || '',
+            transcription,
+            duration
+        );
+
+        if (evaluatingEl) evaluatingEl.style.display = 'none';
+
+        if (response.success && response.data) {
+            this.renderSpeakingResult(response.data, transcription, duration);
+        } else {
+            alert('评判失败: ' + (response.message || '请稍后重试'));
+            // 恢复提交按钮
+            document.getElementById('btn-submit-speaking').style.display = 'inline-block';
+        }
+    } catch (err) {
+        console.error('口语评判失败:', err);
+        if (evaluatingEl) evaluatingEl.style.display = 'none';
+        alert('评判请求失败: ' + err.message);
+        document.getElementById('btn-submit-speaking').style.display = 'inline-block';
+    }
+};
+
+/**
+ * 渲染评判结果
+ */
+WordCollectionApp.prototype.renderSpeakingResult = function(data, transcription, duration) {
+    const resultSection = document.getElementById('speaking-result-section');
+    if (!resultSection) return;
+
+    resultSection.style.display = 'block';
+
+    // 总分
+    const overallScore = data.overall || 0;
+    document.getElementById('speaking-overall-score').textContent = overallScore;
+
+    // 评分维度
+    const scores = data.scores || {};
+    const dimensionLabels = {
+        fluency: '🗣️ 流利度',
+        grammar: '📝 语法',
+        content: '💡 内容',
+        vocabulary: '📚 词汇',
+        pronunciation: '🎤 发音'
+    };
+
+    const scoresGrid = document.getElementById('speaking-scores-grid');
+    if (scoresGrid) {
+        scoresGrid.innerHTML = Object.entries(dimensionLabels).map(([key, label]) => {
+            const score = scores[key] || 0;
+            const color = score >= 80 ? '#4caf50' : score >= 60 ? '#ff9800' : '#f44336';
+            return `
+                <div class="speaking-score-item">
+                    <div class="speaking-score-label">${label}</div>
+                    <div class="speaking-score-value" style="color: ${color}">${score}</div>
+                    <div class="speaking-score-bar">
+                        <div class="speaking-score-bar-fill" style="width: ${score}%; background: ${color}"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 统计数据
+    const statsRow = document.getElementById('speaking-stats-row');
+    if (statsRow) {
+        const wordStats = data.wordStats || {};
+        const wordCount = wordStats.wordCount || (transcription ? transcription.split(/\s+/).filter(w => w.length > 0).length : 0);
+        const wordsPerMin = wordStats.wordsPerMin || (duration > 0 ? Math.round((wordCount / duration) * 60) : 0);
+
+        statsRow.innerHTML = `
+            <div class="speaking-stat-item">📝 词数: <span>${wordCount}</span></div>
+            <div class="speaking-stat-item">⏱️ 时长: <span>${duration || wordStats.durationSec || 0}秒</span></div>
+            <div class="speaking-stat-item">⚡ 语速: <span>${wordsPerMin}</span> 词/分</div>
+            ${data.fallback ? '<div class="speaking-stat-item">📦 <span>本地评判</span></div>' : '<div class="speaking-stat-item">🤖 <span>AI评判</span></div>'}
+        `;
+    }
+
+    // 反馈详情
+    const feedbackEl = document.getElementById('speaking-feedback');
+    if (feedbackEl) {
+        const feedback = data.feedback || {};
+        const feedbackLabels = {
+            fluency: '🗣️ 流利度',
+            grammar: '📝 语法',
+            content: '💡 内容',
+            vocabulary: '📚 词汇'
+        };
+
+        feedbackEl.innerHTML = Object.entries(feedbackLabels).map(([key, label]) => {
+            const text = feedback[key];
+            if (!text) return '';
+            return `
+                <div class="speaking-feedback-item">
+                    <div class="speaking-feedback-title">${label}</div>
+                    <div class="speaking-feedback-text">${text}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 语法错误
+    const errorsEl = document.getElementById('speaking-errors');
+    if (errorsEl) {
+        const errors = data.errors || [];
+        if (errors.length > 0) {
+            errorsEl.style.display = 'block';
+            errorsEl.innerHTML = `
+                <div class="speaking-feedback-title" style="margin-bottom: 8px;">❌ 语法错误修正</div>
+                ${errors.map(e => `
+                    <div class="speaking-error-item">
+                        <span class="speaking-error-original">${e.original}</span>
+                        <span class="speaking-error-arrow">→</span>
+                        <span class="speaking-error-correction">${e.correction}</span>
+                        <span style="color: #999; font-size: 0.75rem;">(${e.type || 'grammar'})</span>
+                    </div>
+                `).join('')}
+            `;
+        } else {
+            errorsEl.style.display = 'none';
+        }
+    }
+
+    // 改进建议
+    const suggestionsEl = document.getElementById('speaking-suggestions');
+    if (suggestionsEl) {
+        const suggestions = data.suggestions || [];
+        if (suggestions.length > 0) {
+            suggestionsEl.innerHTML = `
+                <div class="speaking-feedback-title" style="margin-bottom: 8px;">💡 改进建议</div>
+                ${suggestions.map(s => `<div class="speaking-suggestion-item">${s}</div>`).join('')}
+            `;
+        } else {
+            suggestionsEl.innerHTML = '';
+        }
+    }
+
+    // 参考范文
+    const referenceEl = document.getElementById('speaking-reference');
+    if (referenceEl) {
+        if (data.referenceAnswer) {
+            referenceEl.innerHTML = `
+                <div class="speaking-reference-title">📖 参考范文</div>
+                <div class="speaking-reference-text">${data.referenceAnswer}</div>
+            `;
+        } else {
+            referenceEl.innerHTML = '';
+        }
+    }
+
+    // 记录学习活动
+    this.recordSpeakingActivity(overallScore, transcription);
+};
+
+/**
+ * 记录口语练习活动
+ */
+WordCollectionApp.prototype.recordSpeakingActivity = function(score, transcription) {
+    const wordCount = transcription ? transcription.split(/\s+/).filter(w => w.length > 0).length : 0;
+
+    // 记录到活动
+    if (typeof BackendStorage !== 'undefined') {
+        BackendStorage.addActivity({
+            type: 'speaking',
+            title: `口语练习 - 得分${score}分`,
+            detail: `${wordCount}词`,
+            score: score
+        });
+    }
+
+    // 记录到错题本（低分自动记录）
+    if (score < 60) {
+        this.addWrongRecord({
+            word: this.speakingCurrentTopic?.topic || '口语练习',
+            type: 'speaking',
+            meaning: `得分: ${score}/100`,
+            correctAnswer: '请参考AI给出的参考范文',
+            userAnswer: transcription
+        });
+    }
+};
+
+/**
+ * 下一轮口语练习
+ */
+WordCollectionApp.prototype.nextSpeakingRound = function() {
+    // 重置状态
+    this.resetSpeakingState();
+
+    // 隐藏结果区
+    document.getElementById('speaking-result-section').style.display = 'none';
+    document.getElementById('speaking-record-section').style.display = 'none';
+
+    // 重新生成话题
+    this.generateSpeakingTopic();
+};
+
+/**
+ * 重置口语练习状态
+ */
+WordCollectionApp.prototype.resetSpeakingState = function() {
+    // 清理录音资源
+    if (this.speakingMediaRecorder && this.speakingIsRecording) {
+        try { this.speakingMediaRecorder.stop(); } catch(e) {}
+        this.speakingIsRecording = false;
+    }
+    if (this.speakingRecognition) {
+        try { this.speakingRecognition.stop(); } catch(e) {}
+        this.speakingRecognition = null;
+    }
+    if (this.speakingTimer) {
+        clearInterval(this.speakingTimer);
+        this.speakingTimer = null;
+    }
+    if (this.speakingStream) {
+        this.speakingStream.getTracks().forEach(track => track.stop());
+        this.speakingStream = null;
+    }
+    if (this.speakingAudioUrl) {
+        URL.revokeObjectURL(this.speakingAudioUrl);
+        this.speakingAudioUrl = null;
+    }
+
+    // 重置状态变量
+    this.speakingAudioChunks = [];
+    this.speakingAudioBlob = null;
+    this.speakingMediaRecorder = null;
+    this.speakingTranscription = '';
+    this.speakingDuration = 0;
+    this.speakingStartTime = 0;
+
+    // 重置UI
+    const timerEl = document.getElementById('speaking-timer');
+    if (timerEl) timerEl.textContent = '00:00';
+
+    const btnStart = document.getElementById('btn-record-start');
+    const btnStop = document.getElementById('btn-record-stop');
+    const btnPlay = document.getElementById('btn-record-play');
+    const btnSubmit = document.getElementById('btn-submit-speaking');
+    const waveform = document.getElementById('speaking-waveform');
+    const transcription = document.getElementById('speaking-transcription');
+    const evaluating = document.getElementById('speaking-evaluating');
+    const textInput = document.getElementById('speaking-text-input');
+
+    if (btnStart) btnStart.style.display = 'inline-block';
+    if (btnStop) btnStop.style.display = 'none';
+    if (btnPlay) btnPlay.style.display = 'none';
+    if (btnSubmit) btnSubmit.style.display = 'none';
+    if (waveform) waveform.style.display = 'none';
+    if (transcription) transcription.style.display = 'none';
+    if (evaluating) evaluating.style.display = 'none';
+    if (textInput) textInput.value = '';
+};
+
+// ===== AI学习导师对话模块 =====
+
+/**
+ * 切换导师面板显示/隐藏
+ */
+WordCollectionApp.prototype.toggleTutorPanel = function() {
+    this.tutorPanelOpen = !this.tutorPanelOpen;
+
+    const panel = document.getElementById('tutor-panel');
+    const overlay = document.getElementById('tutor-overlay');
+    const fab = document.getElementById('tutor-fab');
+
+    if (this.tutorPanelOpen) {
+        panel.classList.add('active');
+        if (window.innerWidth <= 480) {
+            overlay.classList.add('active');
+        }
+        if (fab) fab.style.transform = 'scale(0)';
+        // 聚焦输入框
+        setTimeout(() => {
+            const input = document.getElementById('tutor-input');
+            if (input) input.focus();
+        }, 350);
+    } else {
+        panel.classList.remove('active');
+        overlay.classList.remove('active');
+        if (fab) fab.style.transform = 'scale(1)';
+    }
+};
+
+/**
+ * 处理输入框按键事件
+ */
+WordCollectionApp.prototype.handleTutorInputKey = function(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        this.sendTutorMessage();
+    }
+
+    // 自适应高度
+    const input = event.target;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+};
+
+/**
+ * 发送快捷问题
+ */
+WordCollectionApp.prototype.sendQuickQuestion = function(question) {
+    const input = document.getElementById('tutor-input');
+    if (input) {
+        input.value = question;
+    }
+    this.sendTutorMessage();
+};
+
+/**
+ * 发送导师消息
+ */
+WordCollectionApp.prototype.sendTutorMessage = async function() {
+    if (this.tutorIsSending) return;
+
+    const input = document.getElementById('tutor-input');
+    const message = input ? input.value.trim() : '';
+
+    if (!message) return;
+
+    // 检查登录状态
+    if (typeof api === 'undefined' || !api.isLoggedIn()) {
+        this.addTutorMessage('bot', '请先登录后再使用AI导师功能 😊\n\n点击右上角"登录"按钮即可注册/登录。');
+        return;
+    }
+
+    // 清空输入框
+    input.value = '';
+    input.style.height = 'auto';
+
+    // 添加用户消息到界面
+    this.addTutorMessage('user', message);
+
+    // 隐藏快捷模板（首次提问后）
+    const templates = document.getElementById('tutor-quick-templates');
+    if (templates) templates.style.display = 'none';
+
+    // 显示打字指示器
+    this.showTutorTyping();
+
+    // 禁用发送按钮
+    this.tutorIsSending = true;
+    const sendBtn = document.getElementById('tutor-btn-send');
+    if (sendBtn) sendBtn.disabled = true;
+
+    try {
+        // 隐藏打字指示器，创建流式消息气泡
+        this.hideTutorTyping();
+        const streamBubble = this.createTutorStreamBubble();
+
+        let fullContent = '';
+
+        await api.streamTutorChat(message, this.tutorSessionId,
+            // onToken: 逐字追加内容
+            (token, meta) => {
+                if (meta && meta.type === 'session' && meta.sessionId) {
+                    this.tutorSessionId = meta.sessionId;
+                }
+                if (token) {
+                    fullContent += token;
+                    this.updateTutorStreamBubble(streamBubble, fullContent);
+                }
+            },
+            // onDone: 渲染最终格式 + 提取推荐动作
+            (finalContent) => {
+                fullContent = finalContent || fullContent;
+                this.finalizeTutorStreamBubble(streamBubble, fullContent);
+            },
+            // onError: 显示降级提示
+            (errMsg) => {
+                console.error('流式导师对话失败:', errMsg);
+                if (!fullContent) {
+                    fullContent = '抱歉，AI服务暂时不可用，请稍后再试。\n\n你也可以尝试非流式模式，或检查API Key配置。';
+                }
+                this.finalizeTutorStreamBubble(streamBubble, fullContent);
+            }
+        );
+    } catch (err) {
+        console.error('导师对话失败:', err);
+        this.hideTutorTyping();
+        this.addTutorMessage('bot', '网络错误，请检查网络连接后重试。');
+    } finally {
+        this.tutorIsSending = false;
+        if (sendBtn) sendBtn.disabled = false;
+    }
+};
+
+/**
+ * 创建流式消息气泡（初始为空，逐步填充）
+ */
+WordCollectionApp.prototype.createTutorStreamBubble = function() {
+    const messagesEl = document.getElementById('tutor-messages');
+    if (!messagesEl) return null;
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'tutor-msg tutor-msg-bot tutor-msg-streaming';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'tutor-msg-avatar';
+    avatar.textContent = '🤖';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'tutor-msg-bubble tutor-stream-bubble';
+    bubble.innerHTML = '<span class="tutor-stream-cursor">▋</span>';
+
+    msgDiv.appendChild(avatar);
+    msgDiv.appendChild(bubble);
+    messagesEl.appendChild(msgDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    return { msgDiv, bubble };
+};
+
+/**
+ * 实时更新流式消息内容
+ */
+WordCollectionApp.prototype.updateTutorStreamBubble = function(streamObj, content) {
+    if (!streamObj || !streamObj.bubble) return;
+
+    // 流式过程中使用纯文本预览（避免半截markdown渲染闪烁）
+    const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+    streamObj.bubble.innerHTML = escaped + '<span class="tutor-stream-cursor">▋</span>';
+
+    const messagesEl = document.getElementById('tutor-messages');
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+};
+
+/**
+ * 流式完成后，渲染最终格式化内容 + 提取推荐动作
+ */
+WordCollectionApp.prototype.finalizeTutorStreamBubble = function(streamObj, fullContent) {
+    if (!streamObj || !streamObj.bubble) return;
+
+    // 移除流式标记
+    streamObj.msgDiv.classList.remove('tutor-msg-streaming');
+
+    // 使用完整格式化渲染
+    streamObj.bubble.innerHTML = this.formatTutorMessage(fullContent);
+
+    // 提取推荐动作
+    const recommendations = this.extractTutorRecommendations(fullContent);
+    if (recommendations && recommendations.length > 0) {
+        recommendations.forEach(rec => {
+            const recDiv = document.createElement('div');
+            recDiv.className = 'tutor-recommendation';
+            recDiv.onclick = () => {
+                if (rec.page) {
+                    this.switchPage(rec.page);
+                    this.toggleTutorPanel();
+                }
+            };
+            recDiv.innerHTML = `
+                <span class="tutor-recommendation-icon">${rec.icon || '💡'}</span>
+                <span class="tutor-recommendation-text">${rec.text}</span>
+                ${rec.page ? '<span class="tutor-recommendation-arrow">→</span>' : ''}
+            `;
+            streamObj.msgDiv.appendChild(recDiv);
+        });
+    }
+
+    const messagesEl = document.getElementById('tutor-messages');
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+};
+
+/**
+ * 从回复文本中提取推荐动作
+ */
+WordCollectionApp.prototype.extractTutorRecommendations = function(reply) {
+    const recommendations = [];
+    const actionMatch = reply.match(/【推荐动作】(.+)/);
+    if (actionMatch) {
+        const action = actionMatch[1].trim();
+        if (/词汇|单词|背词/.test(action)) {
+            recommendations.push({ text: action, page: 'practice', icon: '✏️' });
+        } else if (/阅读/.test(action)) {
+            recommendations.push({ text: action, page: 'reading', icon: '📖' });
+        } else if (/翻译/.test(action)) {
+            recommendations.push({ text: action, page: 'translation', icon: '🌐' });
+        } else if (/填空|语法/.test(action)) {
+            recommendations.push({ text: action, page: 'cloze', icon: '📝' });
+        } else if (/作文|写作/.test(action)) {
+            recommendations.push({ text: action, page: 'writing', icon: '✍️' });
+        } else if (/复习/.test(action)) {
+            recommendations.push({ text: action, page: 'review', icon: '🔄' });
+        } else if (/口语/.test(action)) {
+            recommendations.push({ text: action, page: 'speaking', icon: '🗣️' });
+        } else {
+            recommendations.push({ text: action, page: null, icon: '💡' });
+        }
+    }
+    return recommendations;
+};
+
+/**
+ * 添加消息到聊天界面
+ */
+WordCollectionApp.prototype.addTutorMessage = function(role, content, recommendations) {
+    const messagesEl = document.getElementById('tutor-messages');
+    if (!messagesEl) return;
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `tutor-msg tutor-msg-${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'tutor-msg-avatar';
+    avatar.textContent = role === 'bot' ? '🤖' : '👤';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'tutor-msg-bubble';
+
+    // 将文本转换为HTML（支持简单的markdown格式）
+    const formattedContent = this.formatTutorMessage(content);
+    bubble.innerHTML = formattedContent;
+
+    msgDiv.appendChild(avatar);
+    msgDiv.appendChild(bubble);
+
+    // 添加推荐动作卡片
+    if (recommendations && recommendations.length > 0) {
+        recommendations.forEach(rec => {
+            const recDiv = document.createElement('div');
+            recDiv.className = 'tutor-recommendation';
+            recDiv.onclick = () => {
+                if (rec.page) {
+                    this.switchPage(rec.page);
+                    this.toggleTutorPanel();
+                }
+            };
+
+            recDiv.innerHTML = `
+                <span class="tutor-recommendation-icon">${rec.icon || '💡'}</span>
+                <span class="tutor-recommendation-text">${rec.text}</span>
+                ${rec.page ? '<span class="tutor-recommendation-arrow">→</span>' : ''}
+            `;
+            msgDiv.appendChild(recDiv);
+        });
+    }
+
+    messagesEl.appendChild(msgDiv);
+
+    // 滚动到底部
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+};
+
+/**
+ * 格式化导师消息（简单markdown支持）
+ */
+WordCollectionApp.prototype.formatTutorMessage = function(content) {
+    if (!content) return '';
+
+    // 转义HTML
+    let html = content
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // 换行处理
+    html = html.replace(/\n/g, '<br>');
+
+    // 加粗 **text**
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // 行内代码 `code`
+    html = html.replace(/`(.+?)`/g, '<code>$1</code>');
+
+    // 推荐动作标记
+    html = html.replace(/【推荐动作】(.+)/g, '<div style="margin-top:8px;padding:6px 10px;background:rgba(108,92,231,0.1);border-radius:6px;font-size:0.82rem;color:#6c5ce7;">💡 $1</div>');
+
+    return html;
+};
+
+/**
+ * 显示打字指示器
+ */
+WordCollectionApp.prototype.showTutorTyping = function() {
+    const messagesEl = document.getElementById('tutor-messages');
+    if (!messagesEl) return;
+
+    // 移除已有的打字指示器
+    this.hideTutorTyping();
+
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'tutor-msg tutor-msg-bot';
+    typingDiv.id = 'tutor-typing-indicator';
+
+    typingDiv.innerHTML = `
+        <div class="tutor-msg-avatar">🤖</div>
+        <div class="tutor-msg-bubble">
+            <div class="tutor-typing">
+                <div class="tutor-typing-dot"></div>
+                <div class="tutor-typing-dot"></div>
+                <div class="tutor-typing-dot"></div>
+            </div>
+        </div>
+    `;
+
+    messagesEl.appendChild(typingDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+};
+
+/**
+ * 隐藏打字指示器
+ */
+WordCollectionApp.prototype.hideTutorTyping = function() {
+    const indicator = document.getElementById('tutor-typing-indicator');
+    if (indicator) indicator.remove();
+};
+
+/**
+ * 清除导师对话
+ */
+WordCollectionApp.prototype.clearTutorChat = async function() {
+    if (!this.tutorSessionId) {
+        // 本地清除消息
+        this.resetTutorMessages();
+        return;
+    }
+
+    try {
+        await api.clearTutorSession(this.tutorSessionId);
+        this.tutorSessionId = null;
+        this.resetTutorMessages();
+    } catch (err) {
+        console.error('清除会话失败:', err);
+        this.resetTutorMessages();
+    }
+};
+
+/**
+ * 重置聊天消息为欢迎消息
+ */
+WordCollectionApp.prototype.resetTutorMessages = function() {
+    const messagesEl = document.getElementById('tutor-messages');
+    if (!messagesEl) return;
+
+    messagesEl.innerHTML = `
+        <div class="tutor-msg tutor-msg-bot">
+            <div class="tutor-msg-avatar">🤖</div>
+            <div class="tutor-msg-bubble">
+                <p>对话已清除 ✨</p>
+                <p>有什么我可以帮你的吗？</p>
+            </div>
+        </div>
+    `;
+
+    // 重新显示快捷模板
+    const templates = document.getElementById('tutor-quick-templates');
+    if (templates) templates.style.display = 'flex';
+};
+
+// ===== 错题整理平台增强功能 =====
+
+// 搜索错题
+WordCollectionApp.prototype.searchWrongRecords = function(keyword) {
+    this.wrongSearchKeyword = keyword.trim();
+    this.renderWrongList(this.wrongCurrentFilter || 'all');
+};
+
+// 切换掌握状态（单条循环：未掌握 → 复习中 → 已掌握 → 未掌握）
+WordCollectionApp.prototype.cycleMasteryStatus = function(id) {
+    const record = this.wrongRecords.find(r => String(r.id) === String(id));
+    if (!record) return;
+
+    const cycle = ['unmastered', 'reviewing', 'mastered'];
+    const current = record.mastery || 'unmastered';
+    const nextIndex = (cycle.indexOf(current) + 1) % cycle.length;
+    record.mastery = cycle[nextIndex];
+
+    this.saveWrongRecords();
+    this.renderWrongList(this.wrongCurrentFilter || 'all');
+    this.showToast(`已标记为：${record.mastery === 'unmastered' ? '未掌握' : record.mastery === 'reviewing' ? '复习中' : '已掌握'}`, 'success');
+};
+
+// 批量模式切换
+WordCollectionApp.prototype.toggleBatchMode = function() {
+    this.wrongBatchMode = !this.wrongBatchMode;
+    this.wrongSelectedIds = this.wrongBatchMode ? new Set() : null;
+
+    const toolbar = document.getElementById('wrong-batch-toolbar');
+    const btn = document.getElementById('btn-batch-mode');
+
+    if (toolbar) toolbar.style.display = this.wrongBatchMode ? 'flex' : 'none';
+    if (btn) {
+        btn.textContent = this.wrongBatchMode ? '✖️ 退出批量' : '☑️ 批量管理';
+        btn.classList.toggle('active', this.wrongBatchMode);
+    }
+
+    this.renderWrongList(this.wrongCurrentFilter || 'all');
+};
+
+// 全选/取消全选
+WordCollectionApp.prototype.toggleSelectAllWrong = function(checked) {
+    const checkboxes = document.querySelectorAll('.wrong-batch-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checked;
+        const id = cb.dataset.id;
+        if (checked) {
+            this.wrongSelectedIds.add(id);
+        } else {
+            this.wrongSelectedIds.delete(id);
+        }
+    });
+    this.updateBatchSelection();
+};
+
+// 更新批量选中计数
+WordCollectionApp.prototype.updateBatchSelection = function() {
+    this.wrongSelectedIds = new Set();
+    document.querySelectorAll('.wrong-batch-checkbox:checked').forEach(cb => {
+        this.wrongSelectedIds.add(cb.dataset.id);
+    });
+
+    const countEl = document.getElementById('wrong-batch-count');
+    if (countEl) countEl.textContent = `已选 ${this.wrongSelectedIds.size} 项`;
+
+    // 更新全选复选框状态
+    const selectAll = document.getElementById('wrong-select-all');
+    const allCheckboxes = document.querySelectorAll('.wrong-batch-checkbox');
+    if (selectAll && allCheckboxes.length > 0) {
+        selectAll.checked = this.wrongSelectedIds.size === allCheckboxes.length;
+    }
+};
+
+// 恢复批量选中状态（重新渲染后）
+WordCollectionApp.prototype.restoreBatchSelection = function() {
+    if (!this.wrongSelectedIds) return;
+    document.querySelectorAll('.wrong-batch-checkbox').forEach(cb => {
+        if (this.wrongSelectedIds.has(cb.dataset.id)) {
+            cb.checked = true;
+        }
+    });
+    this.updateBatchSelection();
+};
+
+// 批量设置掌握状态
+WordCollectionApp.prototype.batchSetMastery = function(status) {
+    if (this.wrongSelectedIds.size === 0) {
+        this.showToast('请先选择错题', 'warning');
+        return;
+    }
+
+    let count = 0;
+    this.wrongRecords.forEach(r => {
+        if (this.wrongSelectedIds.has(String(r.id))) {
+            r.mastery = status;
+            count++;
+        }
+    });
+
+    this.saveWrongRecords();
+    this.showToast(`已将 ${count} 道错题标记为${status === 'reviewing' ? '复习中' : '已掌握'}`, 'success');
+    this.renderWrongList(this.wrongCurrentFilter || 'all');
+};
+
+// 批量加入复习
+WordCollectionApp.prototype.batchAddToReview = async function() {
+    if (this.wrongSelectedIds.size === 0) {
+        this.showToast('请先选择错题', 'warning');
+        return;
+    }
+
+    let count = 0;
+    for (const id of this.wrongSelectedIds) {
+        const record = this.wrongRecords.find(r => String(r.id) === String(id));
+        if (!record) continue;
+
+        const reviewData = {
+            type: 'wrong_item',
+            title: record.word || record.question || '错题复习',
+            content: record.question || record.word || '',
+            hint: record.correctAnswer || record.meaning || '',
+            data: { wrongRecordId: record.id, originalType: record.type }
+        };
+
+        try {
+            if (api.isLoggedIn()) {
+                await api.addReviewItem(reviewData);
+            }
+            record.mastery = 'reviewing';
+            count++;
+        } catch (e) {
+            console.log('加入复习失败:', e.message);
+        }
+    }
+
+    this.saveWrongRecords();
+    this.showToast(`已将 ${count} 道错题加入复习队列`, 'success');
+    this.renderWrongList(this.wrongCurrentFilter || 'all');
+};
+
+// 批量删除
+WordCollectionApp.prototype.batchDeleteWrong = function() {
+    if (this.wrongSelectedIds.size === 0) {
+        this.showToast('请先选择错题', 'warning');
+        return;
+    }
+
+    const count = this.wrongSelectedIds.size;
+    if (!confirm(`确定要删除选中的 ${count} 道错题吗？此操作不可撤销。`)) return;
+
+    this.wrongRecords = this.wrongRecords.filter(r => !this.wrongSelectedIds.has(String(r.id)));
+    this.saveWrongRecords();
+    this.wrongSelectedIds.clear();
+
+    const selectAll = document.getElementById('wrong-select-all');
+    if (selectAll) selectAll.checked = false;
+
+    this.showToast(`已删除 ${count} 道错题`, 'success');
+    this.renderWrongList(this.wrongCurrentFilter || 'all');
+};
+
+// 导出错题
+WordCollectionApp.prototype.exportWrongRecords = function() {
+    const records = this.wrongRecords || [];
+    if (records.length === 0) {
+        this.showToast('暂无错题可导出', 'warning');
+        return;
+    }
+
+    const typeMap = {practice: '例句练习', reading: '阅读练习', cloze: '选词填空', memory: '单词记忆', photo: '拍照错题', translation: '翻译练习'};
+    const masteryMap = {unmastered: '未掌握', reviewing: '复习中', mastered: '已掌握'};
+
+    let csv = '\uFEFF题号,类型,单词,释义,题目,你的答案,正确答案,掌握状态,笔记,AI错误类型,AI分析,创建时间\n';
+
+    records.forEach((r, i) => {
+        const row = [
+            i + 1,
+            typeMap[r.type] || r.type,
+            (r.word || '').replace(/,/g, ' '),
+            (r.meaning || '').replace(/,/g, ' '),
+            (r.question || '').replace(/,/g, ' '),
+            (r.userAnswer || '').replace(/,/g, ' '),
+            (r.correctAnswer || '').replace(/,/g, ' '),
+            masteryMap[r.mastery || 'unmastered'] || '未掌握',
+            (r.note || '').replace(/,/g, ' '),
+            r.aiAnalysis?.errorType || '',
+            (r.aiAnalysis?.reason || '').replace(/,/g, ' '),
+            new Date(r.createdAt).toLocaleString('zh-CN')
+        ];
+        csv += row.map(field => `"${field}"`).join(',') + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `错题导出_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    this.showToast(`已导出 ${records.length} 道错题`, 'success');
+};
+
+// ===== 错题分析仪表板 =====
+
+WordCollectionApp.prototype.renderErrorAnalysisDashboard = function() {
+    const records = this.wrongRecords || [];
+    const analysis = this.localAnalyzeWrongPatterns(records);
+
+    // 1. 掌握状态概览
+    const total = records.length;
+    const unmastered = records.filter(r => (r.mastery || 'unmastered') === 'unmastered').length;
+    const reviewing = records.filter(r => r.mastery === 'reviewing').length;
+    const mastered = records.filter(r => r.mastery === 'mastered').length;
+    const masterRate = total > 0 ? Math.round((mastered / total) * 100) : 0;
+
+    document.getElementById('analysis-total').textContent = total;
+    document.getElementById('analysis-unmastered').textContent = unmastered;
+    document.getElementById('analysis-reviewing').textContent = reviewing;
+    document.getElementById('analysis-mastered').textContent = mastered;
+    document.getElementById('analysis-master-rate').textContent = masterRate + '%';
+
+    // 2. 题型分布柱状图
+    this.renderTypeChart(analysis.typeStats);
+
+    // 3. 错误类型分布
+    this.renderErrorTypeChart(analysis.errorTypeStats);
+
+    // 4. 7天趋势
+    this.renderTrendChart(analysis.last7Days);
+
+    // 5. 薄弱知识点
+    this.renderWeakTopics(analysis.weakTopics);
+
+    // 6. 高频错词
+    this.renderTopWords(analysis.topWords);
+
+    // 7. AI学习建议
+    this.renderAnalysisSuggestions(analysis.suggestions);
+};
+
+WordCollectionApp.prototype.renderTypeChart = function(typeStats) {
+    const container = document.getElementById('analysis-type-chart');
+    if (!container) return;
+
+    const typeNames = {practice: '例句', reading: '阅读', translation: '翻译', cloze: '选词', memory: '记忆', photo: '拍照'};
+    const entries = Object.entries(typeStats);
+    const maxVal = Math.max(...entries.map(e => e[1]), 1);
+
+    if (entries.length === 0) {
+        container.innerHTML = '<div class="analysis-empty">暂无数据</div>';
+        return;
+    }
+
+    const colors = ['#6c8eef', '#feca57', '#ff9ff3', '#54a0ff', '#48dbfb', '#ff6b6b'];
+
+    container.innerHTML = entries.map(([type, count], i) => {
+        const pct = (count / maxVal) * 100;
+        return `
+            <div class="analysis-bar-row">
+                <span class="analysis-bar-label">${typeNames[type] || type}</span>
+                <div class="analysis-bar-track">
+                    <div class="analysis-bar-fill" style="width: ${pct}%; background: ${colors[i % colors.length]};"></div>
+                </div>
+                <span class="analysis-bar-value">${count}</span>
+            </div>
+        `;
+    }).join('');
+};
+
+WordCollectionApp.prototype.renderErrorTypeChart = function(errorTypeStats) {
+    const container = document.getElementById('analysis-error-type-chart');
+    if (!container) return;
+
+    const entries = Object.entries(errorTypeStats);
+    const maxVal = Math.max(...entries.map(e => e[1]), 1);
+
+    if (entries.length === 0) {
+        container.innerHTML = '<div class="analysis-empty">暂无AI错误类型数据<br><small>使用AI分析后可查看</small></div>';
+        return;
+    }
+
+    const colorMap = {
+        '词汇': '#ff6b6b', '语法': '#feca57', '理解': '#48dbfb',
+        '推理': '#ff9ff3', '细节': '#54a0ff', '主旨': '#5f27cd', '拼写': '#ff9f43'
+    };
+
+    container.innerHTML = entries.map(([type, count]) => {
+        const pct = (count / maxVal) * 100;
+        const color = colorMap[type] || '#6c8eef';
+        return `
+            <div class="analysis-bar-row">
+                <span class="analysis-bar-label">${type}</span>
+                <div class="analysis-bar-track">
+                    <div class="analysis-bar-fill" style="width: ${pct}%; background: ${color};"></div>
+                </div>
+                <span class="analysis-bar-value">${count}</span>
+            </div>
+        `;
+    }).join('');
+};
+
+WordCollectionApp.prototype.renderTrendChart = function(last7Days) {
+    const container = document.getElementById('analysis-trend-chart');
+    if (!container) return;
+
+    const maxVal = Math.max(...last7Days.map(d => d.count), 1);
+
+    const weekNames = ['日', '一', '二', '三', '四', '五', '六'];
+
+    container.innerHTML = `
+        <div class="analysis-trend-chart">
+            ${last7Days.map(d => {
+                const date = new Date(d.date);
+                const dayName = weekNames[date.getDay()];
+                const pct = (d.count / maxVal) * 100;
+                return `
+                    <div class="analysis-trend-col">
+                        <div class="analysis-trend-value">${d.count}</div>
+                        <div class="analysis-trend-bar-wrap">
+                            <div class="analysis-trend-bar" style="height: ${Math.max(pct, 5)}%;"></div>
+                        </div>
+                        <div class="analysis-trend-label">周${dayName}</div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+};
+
+WordCollectionApp.prototype.renderWeakTopics = function(weakTopics) {
+    const container = document.getElementById('analysis-weak-topics');
+    if (!container) return;
+
+    if (weakTopics.length === 0) {
+        container.innerHTML = '<div class="analysis-empty">暂无薄弱知识点数据<br><small>使用AI分析后可查看</small></div>';
+        return;
+    }
+
+    const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff9f43', '#1dd1a1', '#e17055', '#fd79a8'];
+
+    container.innerHTML = weakTopics.map((item, i) => `
+        <div class="analysis-rank-item">
+            <span class="analysis-rank-num rank-${i + 1 <= 3 ? 'top' : 'normal'}">${i + 1}</span>
+            <span class="analysis-rank-label">${item.topic}</span>
+            <span class="analysis-rank-count" style="background: ${colors[i % colors.length]}20; color: ${colors[i % colors.length]};">${item.count}次</span>
+        </div>
+    `).join('');
+};
+
+WordCollectionApp.prototype.renderTopWords = function(topWords) {
+    const container = document.getElementById('analysis-top-words');
+    if (!container) return;
+
+    if (topWords.length === 0) {
+        container.innerHTML = '<div class="analysis-empty">暂无高频错词数据</div>';
+        return;
+    }
+
+    const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff9f43', '#1dd1a1', '#e17055', '#fd79a8'];
+
+    container.innerHTML = topWords.map((item, i) => {
+        const word = item[0] || item.word;
+        const count = item[1] || item.count;
+        return `
+            <div class="analysis-rank-item">
+                <span class="analysis-rank-num rank-${i + 1 <= 3 ? 'top' : 'normal'}">${i + 1}</span>
+                <span class="analysis-rank-label">${word}</span>
+                <span class="analysis-rank-count" style="background: ${colors[i % colors.length]}20; color: ${colors[i % colors.length]};">${count}次</span>
+            </div>
+        `;
+    }).join('');
+};
+
+WordCollectionApp.prototype.renderAnalysisSuggestions = function(suggestions) {
+    const container = document.getElementById('analysis-suggestions');
+    if (!container) return;
+
+    if (!suggestions || suggestions.length === 0) {
+        container.innerHTML = '<div class="analysis-empty">多做练习产生错题后，AI将为你生成个性化学习建议</div>';
+        return;
+    }
+
+    const icons = ['🎯', '📈', '💡', '🔄', '⚡'];
+
+    container.innerHTML = suggestions.map((s, i) => `
+        <div class="analysis-suggestion-item">
+            <span class="analysis-suggestion-icon">${icons[i % icons.length]}</span>
+            <span class="analysis-suggestion-text">${s}</span>
+        </div>
+    `).join('');
+};
+
+// ===== 初始化应用 =====
+// ===== 学情预测 + 智能学习计划 =====
+
+/**
+ * 初始化学情预测页面
+ */
+WordCollectionApp.prototype.initPredictionPage = function() {
+    // 设置默认考试日期为120天后
+    const defaultExamDate = new Date();
+    defaultExamDate.setDate(defaultExamDate.getDate() + 120);
+    const dateInput = document.getElementById('plan-exam-date');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = defaultExamDate.toISOString().split('T')[0];
+    }
+
+    // 加载预测数据
+    this.loadPredictionData();
+};
+
+/**
+ * 加载学情预测数据
+ */
+WordCollectionApp.prototype.loadPredictionData = async function() {
+    const dashboard = document.getElementById('prediction-dashboard');
+    if (!dashboard) return;
+
+    // 显示加载状态
+    dashboard.innerHTML = `
+        <div class="prediction-loading">
+            <div class="prediction-loading-icon">📊</div>
+            <p>正在加载学情数据...</p>
+        </div>
+    `;
+
+    // 未登录时显示提示
+    if (!api.isLoggedIn()) {
+        dashboard.innerHTML = `
+            <div class="prediction-empty">
+                <div class="prediction-empty-icon">🔐</div>
+                <p class="prediction-empty-title">请先登录</p>
+                <p class="prediction-empty-desc">登录后即可查看学情预测和生成学习计划</p>
+            </div>
+        `;
+        document.getElementById('plan-generator-section').style.display = 'none';
+        return;
+    }
+
+    try {
+        const response = await api.predictForecast();
+        if (response.success && response.data) {
+            if (response.data.hasData === false) {
+                dashboard.innerHTML = `
+                    <div class="prediction-empty">
+                        <div class="prediction-empty-icon">📈</div>
+                        <p class="prediction-empty-title">暂无学情数据</p>
+                        <p class="prediction-empty-desc">${response.data.message || '开始练习后即可生成学情预测'}</p>
+                        <button class="btn-prediction-goto" onclick="app.switchPage('practice')">去练习</button>
+                    </div>
+                `;
+                document.getElementById('plan-generator-section').style.display = 'none';
+            } else {
+                this.renderPredictionDashboard(response.data);
+                document.getElementById('plan-generator-section').style.display = 'block';
+            }
+        }
+    } catch (err) {
+        console.error('加载学情预测失败:', err);
+        dashboard.innerHTML = `
+            <div class="prediction-empty">
+                <div class="prediction-empty-icon">⚠️</div>
+                <p class="prediction-empty-title">加载失败</p>
+                <p class="prediction-empty-desc">${err.message || '请稍后重试'}</p>
+                <button class="btn-prediction-goto" onclick="app.loadPredictionData()">重新加载</button>
+            </div>
+        `;
+    }
+};
+
+/**
+ * 渲染预测仪表盘
+ */
+WordCollectionApp.prototype.renderPredictionDashboard = function(data) {
+    const dashboard = document.getElementById('prediction-dashboard');
+    if (!dashboard) return;
+
+    const { scoreRange, grade, gradeColor, dimensions, accuracy, totalAnswers, streakDays, improvementPotential, trendData, weakDimension } = data;
+
+    // 维度中文名
+    const dimLabels = {
+        vocabulary: '词汇量',
+        grammar: '语法掌握',
+        reading: '阅读理解',
+        translation: '翻译能力',
+        writing: '写作水平'
+    };
+
+    // 生成维度提升空间卡片
+    let improvementCards = '';
+    Object.entries(improvementPotential).forEach(([dim, info]) => {
+        const priorityLabel = info.priority === 'high' ? '🔴 高优先' : info.priority === 'medium' ? '🟡 中优先' : '🟢 低优先';
+        const priorityClass = info.priority === 'high' ? 'priority-high' : info.priority === 'medium' ? 'priority-medium' : 'priority-low';
+        improvementCards += `
+            <div class="improvement-card ${priorityClass}">
+                <div class="improvement-card-header">
+                    <span class="improvement-dim-name">${dimLabels[dim]}</span>
+                    <span class="improvement-priority">${priorityLabel}</span>
+                </div>
+                <div class="improvement-card-body">
+                    <div class="improvement-score-bar">
+                        <div class="improvement-score-fill" style="width: ${info.current}%"></div>
+                    </div>
+                    <div class="improvement-card-stats">
+                        <span>当前: <strong>${info.current}</strong></span>
+                        <span>权重: <strong>${info.weight}%</strong></span>
+                        <span>提升空间: <strong>+${info.maxGain}</strong></span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    // 生成趋势图
+    let trendChart = '';
+    if (trendData && trendData.length > 0) {
+        const maxTotal = Math.max(...trendData.map(d => d.total), 1);
+        trendChart = trendData.map(d => {
+            const height = (d.total / maxTotal) * 100;
+            const accColor = d.accuracy >= 80 ? '#4caf50' : d.accuracy >= 60 ? '#ff9800' : '#f44336';
+            return `
+                <div class="trend-bar-group">
+                    <div class="trend-bar" style="height: ${height}%;">
+                        <span class="trend-bar-value">${d.total}</span>
+                    </div>
+                    <div class="trend-bar-label">${d.date.slice(5)}</div>
+                    <div class="trend-bar-acc" style="color: ${accColor};">${d.accuracy}%</div>
+                </div>
+            `;
+        }).join('');
+    } else {
+        trendChart = '<p class="trend-empty">暂无学习数据趋势</p>';
+    }
+
+    dashboard.innerHTML = `
+        <!-- 预测分数概览 -->
+        <div class="prediction-score-overview">
+            <div class="score-circle" style="border-color: ${gradeColor};">
+                <div class="score-circle-value" style="color: ${gradeColor};">${scoreRange.predicted}</div>
+                <div class="score-circle-label">预测分数</div>
+            </div>
+            <div class="score-info">
+                <div class="score-grade" style="color: ${gradeColor};">${grade}</div>
+                <div class="score-range">分数区间: ${scoreRange.min} - ${scoreRange.max}</div>
+                <div class="score-meta">
+                    <div class="score-meta-item">
+                        <span class="score-meta-icon">✅</span>
+                        <span class="score-meta-label">正确率</span>
+                        <span class="score-meta-value">${accuracy}%</span>
+                    </div>
+                    <div class="score-meta-item">
+                        <span class="score-meta-icon">📝</span>
+                        <span class="score-meta-label">总答题</span>
+                        <span class="score-meta-value">${totalAnswers}</span>
+                    </div>
+                    <div class="score-meta-item">
+                        <span class="score-meta-icon">🔥</span>
+                        <span class="score-meta-label">连续学习</span>
+                        <span class="score-meta-value">${streakDays}天</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 能力雷达图 -->
+        <div class="radar-section">
+            <h3 class="section-title">🎯 能力画像雷达图</h3>
+            <div class="radar-canvas-wrap">
+                <canvas id="prediction-radar-canvas" width="320" height="320"></canvas>
+            </div>
+        </div>
+
+        <!-- 薄弱维度提示 -->
+        ${weakDimension ? `
+        <div class="weak-dimension-alert">
+            <span class="weak-alert-icon">⚠️</span>
+            <span>最薄弱维度: <strong>${dimLabels[weakDimension[0]]}</strong>（${weakDimension[1]}分），建议优先提升</span>
+        </div>
+        ` : ''}
+
+        <!-- 各维度提升空间 -->
+        <div class="improvement-section">
+            <h3 class="section-title">📊 各维度提升空间分析</h3>
+            <div class="improvement-grid">
+                ${improvementCards}
+            </div>
+        </div>
+
+        <!-- 7天学习趋势 -->
+        <div class="trend-section">
+            <h3 class="section-title">📈 近7天学习趋势</h3>
+            <div class="trend-chart-container">
+                <div class="trend-chart">
+                    ${trendChart}
+                </div>
+                <div class="trend-legend">
+                    <span class="trend-legend-item"><span class="legend-dot" style="background: var(--primary, #6c8eef);"></span>答题数</span>
+                    <span class="trend-legend-item"><span class="legend-dot" style="background: #4caf50;"></span>正确率≥80%</span>
+                    <span class="trend-legend-item"><span class="legend-dot" style="background: #ff9800;"></span>正确率60-79%</span>
+                    <span class="trend-legend-item"><span class="legend-dot" style="background: #f44336;"></span>正确率<60%</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 绘制雷达图
+    this.drawPredictionRadar(dimensions);
+};
+
+/**
+ * 绘制预测页面雷达图
+ */
+WordCollectionApp.prototype.drawPredictionRadar = function(dimensions) {
+    const canvas = document.getElementById('prediction-radar-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = Math.min(cx, cy) - 40;
+
+    const labels = ['词汇量', '语法掌握', '阅读理解', '翻译能力', '写作水平'];
+    const keys = ['vocabulary', 'grammar', 'reading', 'translation', 'writing'];
+    const values = keys.map(k => dimensions[k] || 0);
+    const numAxes = 5;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制网格
+    for (let level = 1; level <= 4; level++) {
+        const r = (radius / 4) * level;
+        ctx.beginPath();
+        for (let i = 0; i < numAxes; i++) {
+            const angle = (Math.PI * 2 / numAxes) * i - Math.PI / 2;
+            const x = cx + Math.cos(angle) * r;
+            const y = cy + Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = level === 4 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // 绘制轴线
+    for (let i = 0; i < numAxes; i++) {
+        const angle = (Math.PI * 2 / numAxes) * i - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // 绘制数据多边形
+    ctx.beginPath();
+    for (let i = 0; i < numAxes; i++) {
+        const angle = (Math.PI * 2 / numAxes) * i - Math.PI / 2;
+        const val = values[i] / 100;
+        const x = cx + Math.cos(angle) * radius * val;
+        const y = cy + Math.sin(angle) * radius * val;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    // 填充
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    gradient.addColorStop(0, 'rgba(108,142,239,0.4)');
+    gradient.addColorStop(1, 'rgba(108,142,239,0.1)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // 边框
+    ctx.strokeStyle = '#6c8eef';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 绘制数据点
+    for (let i = 0; i < numAxes; i++) {
+        const angle = (Math.PI * 2 / numAxes) * i - Math.PI / 2;
+        const val = values[i] / 100;
+        const x = cx + Math.cos(angle) * radius * val;
+        const y = cy + Math.sin(angle) * radius * val;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#6c8eef';
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    // 绘制标签
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < numAxes; i++) {
+        const angle = (Math.PI * 2 / numAxes) * i - Math.PI / 2;
+        const labelR = radius + 25;
+        const x = cx + Math.cos(angle) * labelR;
+        const y = cy + Math.sin(angle) * labelR;
+        ctx.fillStyle = '#ccc';
+        ctx.fillText(labels[i], x, y);
+        ctx.fillStyle = '#6c8eef';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillText(values[i], x, y + 16);
+        ctx.font = '13px sans-serif';
+    }
+};
+
+/**
+ * 生成AI学习计划
+ */
+WordCollectionApp.prototype.generateStudyPlan = async function() {
+    const examDate = document.getElementById('plan-exam-date')?.value;
+    const dailyHours = parseInt(document.getElementById('plan-daily-hours')?.value) || 3;
+    const targetScore = parseInt(document.getElementById('plan-target-score')?.value) || 75;
+
+    const btn = document.getElementById('btn-generate-plan');
+    const display = document.getElementById('study-plan-display');
+
+    if (!display) return;
+
+    // 显示加载状态
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ AI正在生成计划...</span>';
+    display.style.display = 'block';
+    display.innerHTML = `
+        <div class="plan-loading">
+            <div class="plan-loading-spinner"></div>
+            <p>AI正在根据你的学情生成个性化学习计划...</p>
+        </div>
+    `;
+
+    try {
+        const response = await api.generateStudyPlan(examDate, dailyHours, targetScore);
+        if (response.success && response.data) {
+            this.renderStudyPlan(response.data);
+        } else {
+            display.innerHTML = `
+                <div class="plan-error">
+                    <p>❌ ${response.message || '生成失败，请稍后重试'}</p>
+                </div>
+            `;
+        }
+    } catch (err) {
+        console.error('生成学习计划失败:', err);
+        display.innerHTML = `
+            <div class="plan-error">
+                <p>❌ 生成失败: ${err.message}</p>
+                <button class="btn-retry-plan" onclick="app.generateStudyPlan()">重试</button>
+            </div>
+        `;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>✨ 生成AI学习计划</span>';
+    }
+};
+
+/**
+ * 渲染学习计划
+ */
+WordCollectionApp.prototype.renderStudyPlan = function(plan) {
+    const display = document.getElementById('study-plan-display');
+    if (!display) return;
+
+    let phasesHtml = '';
+    if (plan.phases && plan.phases.length > 0) {
+        phasesHtml = plan.phases.map((phase, idx) => {
+            let tasksHtml = '';
+            if (phase.tasks && phase.tasks.length > 0) {
+                tasksHtml = phase.tasks.map(t => `<li>${t}</li>`).join('');
+            }
+
+            let scheduleHtml = '';
+            if (phase.dailySchedule && phase.dailySchedule.length > 0) {
+                scheduleHtml = phase.dailySchedule.map(s => `
+                    <div class="schedule-item">
+                        <span class="schedule-time">${s.time}</span>
+                        <span class="schedule-task">${s.task}</span>
+                        <span class="schedule-duration">${s.duration}</span>
+                    </div>
+                `).join('');
+            }
+
+            return `
+                <div class="plan-phase">
+                    <div class="plan-phase-header">
+                        <div class="plan-phase-number">${idx + 1}</div>
+                        <div class="plan-phase-info">
+                            <h4 class="plan-phase-name">${phase.name}</h4>
+                            <span class="plan-phase-duration">📅 ${phase.duration}</span>
+                        </div>
+                    </div>
+                    <div class="plan-phase-focus">
+                        <span class="focus-label">🎯 重点</span>
+                        <span class="focus-text">${phase.focus}</span>
+                    </div>
+                    ${tasksHtml ? `
+                    <div class="plan-phase-tasks">
+                        <h5>核心任务</h5>
+                        <ul>${tasksHtml}</ul>
+                    </div>
+                    ` : ''}
+                    ${scheduleHtml ? `
+                    <div class="plan-phase-schedule">
+                        <h5>每日时间安排</h5>
+                        <div class="schedule-list">${scheduleHtml}</div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    let weeklyGoalsHtml = '';
+    if (plan.weeklyGoals && plan.weeklyGoals.length > 0) {
+        weeklyGoalsHtml = plan.weeklyGoals.map(g => `<li>${g}</li>`).join('');
+    }
+
+    let tipsHtml = '';
+    if (plan.tips && plan.tips.length > 0) {
+        tipsHtml = plan.tips.map(t => `<div class="plan-tip">${t}</div>`).join('');
+    }
+
+    display.innerHTML = `
+        <div class="study-plan-card">
+            ${plan.fallback ? '<div class="plan-fallback-badge">📋 本地规则生成（AI服务未配置）</div>' : '<div class="plan-ai-badge">🤖 AI智能生成</div>'}
+            
+            <div class="plan-summary">
+                <h3>📋 你的个性化学习计划</h3>
+                <p>${plan.summary || ''}</p>
+            </div>
+
+            ${phasesHtml ? `
+            <div class="plan-phases">
+                <h3 class="plan-section-title">🗓️ 分阶段计划</h3>
+                ${phasesHtml}
+            </div>
+            ` : ''}
+
+            ${weeklyGoalsHtml ? `
+            <div class="plan-weekly-goals">
+                <h3 class="plan-section-title">🎯 每周目标</h3>
+                <ul class="weekly-goals-list">${weeklyGoalsHtml}</ul>
+            </div>
+            ` : ''}
+
+            ${tipsHtml ? `
+            <div class="plan-tips">
+                <h3 class="plan-section-title">💡 学习建议</h3>
+                <div class="tips-list">${tipsHtml}</div>
+            </div>
+            ` : ''}
+
+            ${plan.predictedProgress ? `
+            <div class="plan-predicted">
+                <div class="predicted-icon">🚀</div>
+                <div class="predicted-text">${plan.predictedProgress}</div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+
+    // 滚动到计划区域
+    display.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+// ===== 错题库对话Agent模块 =====
+
+WordCollectionApp.prototype.errorAgentSessionId = null;
+WordCollectionApp.prototype.errorAgentPanelOpen = false;
+WordCollectionApp.prototype.errorAgentIsSending = false;
+
+WordCollectionApp.prototype.toggleErrorAgentPanel = function() {
+    const panel = document.getElementById('error-agent-panel');
+    const fab = document.getElementById('error-agent-fab');
+    const overlay = document.getElementById('error-agent-overlay');
+
+    if (!panel) return;
+
+    this.errorAgentPanelOpen = !this.errorAgentPanelOpen;
+
+    if (this.errorAgentPanelOpen) {
+        panel.classList.add('active');
+        if (fab) fab.style.transform = 'scale(0)';
+        if (window.innerWidth <= 768 && overlay) overlay.style.display = 'block';
+        setTimeout(() => {
+            const input = document.getElementById('error-agent-input');
+            if (input) input.focus();
+        }, 300);
+    } else {
+        panel.classList.remove('active');
+        if (fab) fab.style.transform = 'scale(1)';
+        if (overlay) overlay.style.display = 'none';
+    }
+};
+
+WordCollectionApp.prototype.handleErrorAgentInputKey = function(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        this.sendErrorAgentMessage();
+    }
+    // 自适应高度
+    const textarea = event.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+};
+
+WordCollectionApp.prototype.sendErrorQuickQuestion = function(question) {
+    const input = document.getElementById('error-agent-input');
+    if (input) {
+        input.value = question;
+        this.sendErrorAgentMessage();
+    }
+};
+
+WordCollectionApp.prototype.sendErrorAgentMessage = async function() {
+    const input = document.getElementById('error-agent-input');
+    if (!input) return;
+
+    const message = input.value.trim();
+    if (!message || this.errorAgentIsSending) return;
+
+    if (!api.isLoggedIn()) {
+        this.showToast('请先登录后使用错题分析助手', 'warning');
+        return;
+    }
+
+    // 清空输入框
+    input.value = '';
+    input.style.height = 'auto';
+
+    // 添加用户消息
+    this.addErrorAgentMessage('user', message);
+
+    // 隐藏快捷模板
+    const templates = document.getElementById('error-agent-quick-templates');
+    if (templates) templates.style.display = 'none';
+
+    // 显示打字指示器
+    this.showErrorAgentTyping();
+
+    // 禁用发送按钮
+    this.errorAgentIsSending = true;
+    const sendBtn = document.getElementById('error-agent-btn-send');
+    if (sendBtn) sendBtn.disabled = true;
+
+    try {
+        // 隐藏打字指示器，创建流式消息气泡
+        this.hideErrorAgentTyping();
+        const streamBubble = this.createErrorAgentStreamBubble();
+
+        let fullContent = '';
+
+        await api.streamErrorAgentChat(message, this.errorAgentSessionId,
+            // onToken: 逐字追加内容
+            (token, meta) => {
+                if (meta && meta.type === 'session' && meta.sessionId) {
+                    this.errorAgentSessionId = meta.sessionId;
+                }
+                if (token) {
+                    fullContent += token;
+                    this.updateErrorAgentStreamBubble(streamBubble, fullContent);
+                }
+            },
+            // onDone: 渲染最终格式
+            (finalContent) => {
+                fullContent = finalContent || fullContent;
+                this.finalizeErrorAgentStreamBubble(streamBubble, fullContent);
+            },
+            // onError: 显示降级提示
+            (errMsg) => {
+                console.error('流式错题Agent失败:', errMsg);
+                if (!fullContent) {
+                    fullContent = '抱歉，AI服务暂时不可用，请稍后再试。';
+                }
+                this.finalizeErrorAgentStreamBubble(streamBubble, fullContent);
+            }
+        );
+    } catch (err) {
+        this.hideErrorAgentTyping();
+        this.addErrorAgentMessage('bot', '网络连接失败，请检查网络后重试。');
+    }
+
+    this.errorAgentIsSending = false;
+    if (sendBtn) sendBtn.disabled = false;
+};
+
+WordCollectionApp.prototype.addErrorAgentMessage = function(role, content, recommendations) {
+    const messagesEl = document.getElementById('error-agent-messages');
+    if (!messagesEl) return;
+
+    const escapedContent = this.formatErrorAgentMessage(content);
+
+    let html = '';
+    if (role === 'user') {
+        html = `<div class="error-agent-msg error-agent-msg-user">
+            <div class="error-agent-msg-bubble">${escapedContent}</div>
+            <div class="error-agent-msg-avatar">🙋</div>
+        </div>`;
+    } else {
+        html = `<div class="error-agent-msg error-agent-msg-bot">
+            <div class="error-agent-msg-avatar">🔍</div>
+            <div class="error-agent-msg-bubble">
+                ${escapedContent}
+                ${this.renderErrorAgentRecommendations(recommendations)}
+            </div>
+        </div>`;
+    }
+
+    messagesEl.insertAdjacentHTML('beforeend', html);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+};
+
+WordCollectionApp.prototype.formatErrorAgentMessage = function(content) {
+    if (!content) return '';
+    let html = content;
+
+    // 转义HTML
+    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // 换行
+    html = html.replace(/\n/g, '<br>');
+
+    // 粗体
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // 行内代码
+    html = html.replace(/`(.+?)`/g, '<code>$1</code>');
+
+    // 代码块
+    html = html.replace(/```json([\s\S]*?)```/g, '<pre class="error-agent-code-block">$1</pre>');
+    html = html.replace(/```([\s\S]*?)```/g, '<pre class="error-agent-code-block">$1</pre>');
+
+    // 【推荐动作】高亮
+    html = html.replace(/【推荐动作】(.+)/g, '<div class="error-agent-action-highlight">【推荐动作】$1</div>');
+
+    return html;
+};
+
+/**
+ * 创建错题Agent流式消息气泡
+ */
+WordCollectionApp.prototype.createErrorAgentStreamBubble = function() {
+    const messagesEl = document.getElementById('error-agent-messages');
+    if (!messagesEl) return null;
+
+    const html = `<div class="error-agent-msg error-agent-msg-bot error-agent-msg-streaming" id="error-agent-stream-msg">
+        <div class="error-agent-msg-avatar">🔍</div>
+        <div class="error-agent-msg-bubble error-agent-stream-bubble">
+            <span class="error-agent-stream-cursor">▋</span>
+        </div>
+    </div>`;
+
+    messagesEl.insertAdjacentHTML('beforeend', html);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    const msgDiv = document.getElementById('error-agent-stream-msg');
+    const bubble = msgDiv ? msgDiv.querySelector('.error-agent-stream-bubble') : null;
+    return { msgDiv, bubble };
+};
+
+/**
+ * 实时更新错题Agent流式消息内容
+ */
+WordCollectionApp.prototype.updateErrorAgentStreamBubble = function(streamObj, content) {
+    if (!streamObj || !streamObj.bubble) return;
+
+    const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+    streamObj.bubble.innerHTML = escaped + '<span class="error-agent-stream-cursor">▋</span>';
+
+    const messagesEl = document.getElementById('error-agent-messages');
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+};
+
+/**
+ * 流式完成后，渲染最终格式化内容
+ */
+WordCollectionApp.prototype.finalizeErrorAgentStreamBubble = function(streamObj, fullContent) {
+    if (!streamObj || !streamObj.bubble) return;
+
+    if (streamObj.msgDiv) {
+        streamObj.msgDiv.classList.remove('error-agent-msg-streaming');
+        streamObj.msgDiv.removeAttribute('id');
+    }
+
+    streamObj.bubble.innerHTML = this.formatErrorAgentMessage(fullContent);
+
+    const messagesEl = document.getElementById('error-agent-messages');
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+};
+
+WordCollectionApp.prototype.renderErrorAgentRecommendations = function(recommendations) {
+    if (!recommendations || recommendations.length === 0) return '';
+
+    let html = '<div class="error-agent-recommendations">';
+    recommendations.forEach(rec => {
+        html += `<button class="error-agent-rec-btn" onclick="app.switchPage('${rec.page}')">
+            <span>${rec.icon}</span> ${rec.text}
+        </button>`;
+    });
+    html += '</div>';
+    return html;
+};
+
+WordCollectionApp.prototype.showErrorAgentTyping = function() {
+    const messagesEl = document.getElementById('error-agent-messages');
+    if (!messagesEl) return;
+
+    const html = `<div class="error-agent-msg error-agent-msg-bot error-agent-typing" id="error-agent-typing">
+        <div class="error-agent-msg-avatar">🔍</div>
+        <div class="error-agent-msg-bubble">
+            <div class="error-agent-typing-dots">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    </div>`;
+
+    messagesEl.insertAdjacentHTML('beforeend', html);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+};
+
+WordCollectionApp.prototype.hideErrorAgentTyping = function() {
+    const typing = document.getElementById('error-agent-typing');
+    if (typing) typing.remove();
+};
+
+WordCollectionApp.prototype.clearErrorAgentChat = async function() {
+    if (this.errorAgentSessionId) {
+        try {
+            await api.clearErrorAgentSession(this.errorAgentSessionId);
+        } catch (e) {}
+    }
+    this.errorAgentSessionId = null;
+    this.resetErrorAgentMessages();
+};
+
+WordCollectionApp.prototype.resetErrorAgentMessages = function() {
+    const messagesEl = document.getElementById('error-agent-messages');
+    if (!messagesEl) return;
+
+    messagesEl.innerHTML = `
+        <div class="error-agent-msg error-agent-msg-bot">
+            <div class="error-agent-msg-avatar">🔍</div>
+            <div class="error-agent-msg-bubble">
+                <p>对话已清除 ✨</p>
+                <p>有什么我可以帮你分析的？</p>
+            </div>
+        </div>
+    `;
+
+    const templates = document.getElementById('error-agent-quick-templates');
+    if (templates) templates.style.display = 'flex';
+};
+
+// ===== 真题练习模块 =====
+
+WordCollectionApp.prototype.examPracticeSection = null;
+WordCollectionApp.prototype.examPracticeDifficulty = 'easy';
+WordCollectionApp.prototype.examPracticeData = null;
+WordCollectionApp.prototype.examUserAnswers = {};
+
+WordCollectionApp.prototype.initExamPracticePage = function() {
+    this.examPracticeSection = null;
+    this.examPracticeDifficulty = 'easy';
+    this.examPracticeData = null;
+    this.examUserAnswers = {};
+
+    document.getElementById('exam-section-selector').style.display = 'grid';
+    document.getElementById('exam-settings').style.display = 'none';
+    document.getElementById('exam-loading').style.display = 'none';
+    document.getElementById('exam-content').style.display = 'none';
+    document.getElementById('exam-result').style.display = 'none';
+
+    document.querySelectorAll('.exam-section-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+};
+
+WordCollectionApp.prototype.selectExamSection = function(section) {
+    this.examPracticeSection = section;
+    document.querySelectorAll('.exam-section-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.section === section);
+    });
+    document.getElementById('exam-settings').style.display = 'block';
+};
+
+WordCollectionApp.prototype.setExamDifficulty = function(difficulty) {
+    this.examPracticeDifficulty = difficulty;
+    document.querySelectorAll('.exam-diff-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.difficulty === difficulty);
+    });
+};
+
+WordCollectionApp.prototype.generateExamPractice = async function() {
+    if (!this.examPracticeSection) {
+        this.showToast('请先选择题型', 'warning');
+        return;
+    }
+
+    const topic = document.getElementById('exam-topic-select')?.value || '';
+
+    document.getElementById('exam-section-selector').style.display = 'none';
+    document.getElementById('exam-settings').style.display = 'none';
+    document.getElementById('exam-loading').style.display = 'flex';
+    document.getElementById('exam-content').style.display = 'none';
+    document.getElementById('exam-result').style.display = 'none';
+
+    try {
+        const response = await api.generateExamPractice(this.examPracticeSection, this.examPracticeDifficulty, topic);
+
+        document.getElementById('exam-loading').style.display = 'none';
+
+        if (response.success && response.data) {
+            this.examPracticeData = response.data;
+            this.examUserAnswers = {};
+            this.renderExamContent(response.data);
+            document.getElementById('exam-content').style.display = 'block';
+        } else {
+            this.showToast('生成失败：' + (response.message || '未知错误'), 'error');
+            document.getElementById('exam-section-selector').style.display = 'grid';
+            document.getElementById('exam-settings').style.display = 'block';
+        }
+    } catch (err) {
+        document.getElementById('exam-loading').style.display = 'none';
+        this.showToast('网络错误，请重试', 'error');
+        document.getElementById('exam-section-selector').style.display = 'grid';
+        document.getElementById('exam-settings').style.display = 'block';
+    }
+};
+
+WordCollectionApp.prototype.renderExamContent = function(data) {
+    const container = document.getElementById('exam-content');
+    const section = this.examPracticeSection;
+
+    let html = '<div class="exam-paper">';
+
+    // 通用头部
+    html += `<div class="exam-paper-header">
+        <h2>${data.sectionName || '真题练习'}</h2>
+        <div class="exam-paper-meta">
+            <span>难度：${data.difficulty === 'easy' ? '基础' : data.difficulty === 'medium' ? '标准' : '冲刺'}</span>
+            ${data.fallback ? '<span class="exam-fallback-badge">本地题库</span>' : '<span class="exam-ai-badge">AI生成</span>'}
+        </div>
+    </div>`;
+
+    if (section === 'cloze') {
+        html += this.renderClozeExam(data);
+    } else if (section === 'reading_a') {
+        html += this.renderReadingAExam(data);
+    } else if (section === 'reading_b') {
+        html += this.renderReadingBExam(data);
+    } else if (section === 'reading_c') {
+        html += this.renderReadingCExam(data);
+    } else if (section === 'writing_a' || section === 'writing_b') {
+        html += this.renderWritingExam(data);
+    }
+
+    // 提交按钮
+    if (section !== 'writing_a' && section !== 'writing_b') {
+        html += '<div class="exam-submit-area"><button class="btn-exam-submit" onclick="app.submitExamAnswers()">✅ 提交答案</button></div>';
+    }
+
+    // 重新生成按钮
+    html += '<div class="exam-regen-area"><button class="btn-exam-regen" onclick="app.generateExamPractice()">🔄 换一套题</button></div>';
+
+    html += '</div>';
+    container.innerHTML = html;
+};
+
+WordCollectionApp.prototype.renderClozeExam = function(data) {
+    let html = '';
+
+    if (data.passage) {
+        let passage = data.passage;
+        // 将 [1] [2] 等标记替换为带样式的空格标记
+        passage = passage.replace(/\[(\d+)\]/g, (match, num) => {
+            return `<span class="cloze-blank-marker" id="cloze-marker-${num}">[${num}]</span>`;
+        });
+        html += `<div class="exam-passage">${passage}</div>`;
+    }
+
+    if (data.translation) {
+        html += `<details class="exam-translation-toggle"><summary>📝 查看中文翻译</summary><div class="exam-translation">${data.translation}</div></details>`;
+    }
+
+    if (data.questions && data.questions.length > 0) {
+        html += '<div class="exam-questions">';
+        data.questions.forEach(q => {
+            html += `<div class="exam-question-item">
+                <div class="exam-question-num">第${q.index}题</div>
+                <div class="exam-question-options">`;
+            Object.entries(q.options).forEach(([key, val]) => {
+                html += `<label class="exam-option" onclick="app.selectExamOption(${q.index}, '${key}')">
+                    <input type="radio" name="q${q.index}" value="${key}">
+                    <span class="exam-option-key">${key}.</span>
+                    <span class="exam-option-text">${val}</span>
+                </label>`;
+            });
+            html += `</div></div>`;
+        });
+        html += '</div>';
+    }
+
+    return html;
+};
+
+WordCollectionApp.prototype.renderReadingAExam = function(data) {
+    let html = '';
+
+    if (data.title) {
+        html += `<h3 class="exam-article-title">${data.title}</h3>`;
+    }
+
+    if (data.passage) {
+        html += `<div class="exam-passage">${data.passage}</div>`;
+    }
+
+    if (data.translation) {
+        html += `<details class="exam-translation-toggle"><summary>📝 查看中文翻译</summary><div class="exam-translation">${data.translation}</div></details>`;
+    }
+
+    if (data.questions && data.questions.length > 0) {
+        html += '<div class="exam-questions">';
+        data.questions.forEach(q => {
+            html += `<div class="exam-question-item">
+                <div class="exam-question-stem">${q.index}. ${q.stem}</div>
+                <div class="exam-question-options">`;
+            Object.entries(q.options).forEach(([key, val]) => {
+                html += `<label class="exam-option" onclick="app.selectExamOption(${q.index}, '${key}')">
+                    <input type="radio" name="q${q.index}" value="${key}">
+                    <span class="exam-option-key">${key}.</span>
+                    <span class="exam-option-text">${val}</span>
+                </label>`;
+            });
+            html += `</div></div>`;
+        });
+        html += '</div>';
+    }
+
+    return html;
+};
+
+WordCollectionApp.prototype.renderReadingBExam = function(data) {
+    let html = '';
+
+    if (data.title) {
+        html += `<h3 class="exam-article-title">${data.title}</h3>`;
+    }
+
+    if (data.passage) {
+        let passage = data.passage;
+        passage = passage.replace(/\[(\d+)\]/g, (match, num) => {
+            return `<span class="cloze-blank-marker" id="rb-marker-${num}">[${num}]</span>`;
+        });
+        html += `<div class="exam-passage">${passage}</div>`;
+    }
+
+    if (data.options && data.options.length > 0) {
+        html += '<div class="exam-reading-b-options"><h4>备选段落：</h4>';
+        data.options.forEach(opt => {
+            html += `<div class="exam-rb-option" id="rb-opt-${opt.label}" onclick="app.selectRBOption('${opt.label}')">
+                <span class="exam-rb-label">${opt.label}</span>
+                <span class="exam-rb-content">${opt.content}</span>
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    // 答题选择区
+    if (data.correctOrder) {
+        html += '<div class="exam-rb-answers"><h4>请选择各空对应的段落：</h4>';
+        for (let i = 1; i <= data.correctOrder.length; i++) {
+            html += `<div class="exam-rb-answer-row">
+                <span class="exam-rb-answer-num">空${i}：</span>
+                <select class="exam-rb-select" id="rb-answer-${i}" onchange="app.selectRBAnswer(${i}, this.value)">
+                    <option value="">选择</option>
+                    <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                    <option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option>
+                </select>
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    return html;
+};
+
+WordCollectionApp.prototype.renderReadingCExam = function(data) {
+    let html = '';
+
+    if (data.title) {
+        html += `<h3 class="exam-article-title">${data.title}</h3>`;
+    }
+
+    if (data.passage) {
+        html += `<div class="exam-passage">${data.passage}</div>`;
+    }
+
+    if (data.sentences && data.sentences.length > 0) {
+        html += '<div class="exam-translation-questions">';
+        data.sentences.forEach(s => {
+            html += `<div class="exam-translation-item">
+                <div class="exam-translation-original">第${s.index}句：${s.original}</div>
+                <textarea class="exam-translation-input" id="trans-input-${s.index}" placeholder="请输入中文翻译..." rows="3"></textarea>
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    if (data.translation) {
+        html += `<details class="exam-translation-toggle"><summary>📝 查看全文参考翻译</summary><div class="exam-translation">${data.translation}</div></details>`;
+    }
+
+    // 提交翻译答案
+    html += '<div class="exam-submit-area"><button class="btn-exam-submit" onclick="app.submitTranslationExam()">✅ 提交翻译</button></div>';
+
+    return html;
+};
+
+WordCollectionApp.prototype.renderWritingExam = function(data) {
+    let html = '';
+
+    if (data.prompt) {
+        html += `<div class="exam-writing-prompt"><h3>写作题目</h3><p>${data.prompt}</p></div>`;
+    }
+
+    if (data.scenario) {
+        html += `<div class="exam-writing-scenario"><strong>情景：</strong>${data.scenario}</div>`;
+    }
+
+    if (data.chartDescription) {
+        html += `<div class="exam-writing-chart"><strong>图表描述：</strong>${data.chartDescription}</div>`;
+    }
+
+    if (data.requirements && data.requirements.length > 0) {
+        html += '<div class="exam-writing-requirements"><h4>写作要求：</h4><ul>';
+        data.requirements.forEach(r => { html += `<li>${r}</li>`; });
+        html += '</ul></div>';
+    }
+
+    if (data.outline && data.outline.length > 0) {
+        html += '<div class="exam-writing-outline"><h4>写作框架：</h4><ul>';
+        data.outline.forEach(o => { html += `<li>${o}</li>`; });
+        html += '</ul></div>';
+    }
+
+    html += '<div class="exam-writing-input"><h4>你的作文：</h4><textarea class="exam-writing-textarea" id="exam-writing-textarea" placeholder="在此输入你的英文作文..." rows="12"></textarea><div class="exam-word-count" id="exam-word-count">0 words</div></div>';
+
+    html += '<div class="exam-submit-area"><button class="btn-exam-submit" onclick="app.submitWritingExam()">✅ 提交作文</button></div>';
+
+    if (data.referenceEssay) {
+        html += `<details class="exam-translation-toggle"><summary>📖 查看参考范文</summary><div class="exam-reference-essay">${data.referenceEssay.replace(/\n/g, '<br>')}</div></details>`;
+    }
+
+    if (data.tips && data.tips.length > 0) {
+        html += '<details class="exam-translation-toggle"><summary>💡 写作技巧</summary><div class="exam-tips"><ul>';
+        data.tips.forEach(t => { html += `<li>${t}</li>`; });
+        html += '</ul></div></details>';
+    }
+
+    if (data.keyPhrases && data.keyPhrases.length > 0) {
+        html += '<details class="exam-translation-toggle"><summary>📝 常用句型</summary><div class="exam-key-phrases"><ul>';
+        data.keyPhrases.forEach(p => { html += `<li>${p}</li>`; });
+        html += '</ul></div></details>';
+    }
+
+    return html;
+};
+
+WordCollectionApp.prototype.selectExamOption = function(questionIndex, option) {
+    this.examUserAnswers[questionIndex] = option;
+};
+
+WordCollectionApp.prototype.selectRBOption = function(label) {
+    // 高亮选中的段落
+    document.querySelectorAll('.exam-rb-option').forEach(el => el.classList.remove('selected'));
+    const el = document.getElementById(`rb-opt-${label}`);
+    if (el) el.classList.add('selected');
+};
+
+WordCollectionApp.prototype.selectRBAnswer = function(index, value) {
+    this.examUserAnswers[index] = value;
+};
+
+WordCollectionApp.prototype.submitExamAnswers = async function() {
+    if (!this.examPracticeData || !this.examPracticeData.questions) {
+        // 阅读理解Part B
+        if (this.examPracticeData && this.examPracticeData.correctOrder) {
+            const userAnswers = this.examPracticeData.correctOrder.map((_, i) => this.examUserAnswers[i + 1] || '');
+            const correct = this.examPracticeData.correctOrder;
+            let correctCount = 0;
+            const results = correct.map((ans, i) => {
+                const isCorrect = userAnswers[i] === ans;
+                if (isCorrect) correctCount++;
+                return { index: i + 1, userAnswer: userAnswers[i], correctAnswer: ans, isCorrect };
+            });
+            this.showExamResult({
+                score: Math.round((correctCount / correct.length) * 100),
+                correctCount,
+                totalQuestions: correct.length,
+                results,
+                explanations: this.examPracticeData.explanations
+            });
+            return;
+        }
+        this.showToast('没有可提交的题目', 'warning');
+        return;
+    }
+
+    const questions = this.examPracticeData.questions;
+    const userAnswers = questions.map(q => this.examUserAnswers[q.index] || '');
+
+    const unanswered = userAnswers.filter(a => !a).length;
+    if (unanswered > 0) {
+        if (!confirm(`还有${unanswered}题未作答，确定提交吗？`)) return;
+    }
+
+    try {
+        const response = await api.evaluateExamPractice(this.examPracticeSection, questions, userAnswers);
+        if (response.success && response.data) {
+            this.showExamResult(response.data);
+        } else {
+            this.showToast('提交失败', 'error');
+        }
+    } catch (err) {
+        // 本地判分
+        let correctCount = 0;
+        const results = questions.map((q, i) => {
+            const isCorrect = userAnswers[i] === q.correctAnswer;
+            if (isCorrect) correctCount++;
+            return {
+                index: q.index,
+                question: q.stem || '',
+                userAnswer: userAnswers[i],
+                correctAnswer: q.correctAnswer,
+                isCorrect,
+                explanation: q.explanation || ''
+            };
+        });
+        this.showExamResult({
+            score: Math.round((correctCount / questions.length) * 100),
+            correctCount,
+            totalQuestions: questions.length,
+            results
+        });
+    }
+};
+
+WordCollectionApp.prototype.submitTranslationExam = function() {
+    if (!this.examPracticeData || !this.examPracticeData.sentences) return;
+
+    const sentences = this.examPracticeData.sentences;
+    let html = '<div class="exam-result-content">';
+    html += `<div class="exam-result-score">翻译练习结果</div>`;
+    html += '<div class="exam-translation-results">';
+
+    sentences.forEach(s => {
+        const userTrans = document.getElementById(`trans-input-${s.index}`)?.value.trim() || '（未作答）';
+        html += `<div class="exam-translation-result-item">
+            <div class="exam-trans-original">第${s.index}句：${s.original}</div>
+            <div class="exam-trans-user"><strong>你的翻译：</strong>${userTrans}</div>
+            <div class="exam-trans-reference"><strong>参考翻译：</strong>${s.reference}</div>
+            ${s.explanation ? `<div class="exam-trans-explanation"><strong>解析：</strong>${s.explanation}</div>` : ''}
+        </div>`;
+    });
+
+    html += '</div>';
+    html += '<div class="exam-submit-area"><button class="btn-exam-regen" onclick="app.generateExamPractice()">🔄 换一套题</button></div>';
+    html += '</div>';
+
+    document.getElementById('exam-content').style.display = 'none';
+    const resultEl = document.getElementById('exam-result');
+    resultEl.innerHTML = html;
+    resultEl.style.display = 'block';
+    resultEl.scrollIntoView({ behavior: 'smooth' });
+};
+
+WordCollectionApp.prototype.submitWritingExam = function() {
+    const textarea = document.getElementById('exam-writing-textarea');
+    if (!textarea || !textarea.value.trim()) {
+        this.showToast('请输入作文内容', 'warning');
+        return;
+    }
+
+    const essay = textarea.value.trim();
+    const wordCount = essay.split(/\s+/).length;
+
+    let html = '<div class="exam-result-content">';
+    html += `<div class="exam-result-score">作文提交成功</div>`;
+    html += `<div class="exam-writing-stats"><span>字数：${wordCount}词</span></div>`;
+
+    if (this.examPracticeData.referenceEssay) {
+        html += `<div class="exam-writing-comparison">
+            <h4>参考范文</h4>
+            <div class="exam-reference-essay">${this.examPracticeData.referenceEssay.replace(/\n/g, '<br>')}</div>
+        </div>`;
+    }
+
+    if (this.examPracticeData.tips) {
+        html += '<div class="exam-writing-tips"><h4>写作技巧</h4><ul>';
+        this.examPracticeData.tips.forEach(t => { html += `<li>${t}</li>`; });
+        html += '</ul></div>';
+    }
+
+    html += '<div class="exam-submit-area"><button class="btn-exam-regen" onclick="app.generateExamPractice()">🔄 换一套题</button></div>';
+    html += '</div>';
+
+    document.getElementById('exam-content').style.display = 'none';
+    const resultEl = document.getElementById('exam-result');
+    resultEl.innerHTML = html;
+    resultEl.style.display = 'block';
+    resultEl.scrollIntoView({ behavior: 'smooth' });
+};
+
+WordCollectionApp.prototype.showExamResult = function(result) {
+    let html = '<div class="exam-result-content">';
+    html += `<div class="exam-result-score">得分：${result.score}分</div>`;
+    html += `<div class="exam-result-stats">
+        <span>✅ 正确：${result.correctCount}题</span>
+        <span>📊 总题：${result.totalQuestions}题</span>
+    </div>`;
+
+    if (result.results && result.results.length > 0) {
+        html += '<div class="exam-result-details">';
+        result.results.forEach(r => {
+            html += `<div class="exam-result-item ${r.isCorrect ? 'correct' : 'wrong'}">
+                <div class="exam-result-item-header">
+                    <span class="exam-result-icon">${r.isCorrect ? '✅' : '❌'}</span>
+                    <span class="exam-result-q">第${r.index}题</span>
+                </div>
+                <div class="exam-result-answers">
+                    <div>你的答案：${r.userAnswer || '（未作答）'}</div>
+                    <div>正确答案：${r.correctAnswer}</div>
+                </div>
+                ${r.explanation ? `<div class="exam-result-explanation">${r.explanation}</div>` : ''}
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    if (result.explanations) {
+        html += `<div class="exam-result-explanations"><h4>解析：</h4><p>${result.explanations}</p></div>`;
+    }
+
+    html += '<div class="exam-submit-area"><button class="btn-exam-regen" onclick="app.generateExamPractice()">🔄 换一套题</button></div>';
+    html += '</div>';
+
+    document.getElementById('exam-content').style.display = 'none';
+    const resultEl = document.getElementById('exam-result');
+    resultEl.innerHTML = html;
+    resultEl.style.display = 'block';
+    resultEl.scrollIntoView({ behavior: 'smooth' });
+
+    // 如果答错，加入错题本
+    if (result.results) {
+        result.results.filter(r => !r.isCorrect).forEach(r => {
+            if (this.examPracticeData && this.examPracticeData.questions) {
+                const q = this.examPracticeData.questions.find(qq => qq.index === r.index);
+                if (q) {
+                    this.addWrongRecord({
+                        type: 'exam',
+                        word: '',
+                        question: q.stem || `真题第${r.index}题`,
+                        correctAnswer: r.correctAnswer,
+                        userAnswer: r.userAnswer || '',
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        });
+    }
+};
+
+// 初始化时为写作textarea添加字数统计
+WordCollectionApp.prototype.initExamWritingWordCount = function() {
+    const textarea = document.getElementById('exam-writing-textarea');
+    const counter = document.getElementById('exam-word-count');
+    if (textarea && counter) {
+        textarea.addEventListener('input', () => {
+            const count = textarea.value.trim().split(/\s+/).filter(w => w).length;
+            counter.textContent = `${count} words`;
+        });
+    }
 };
 
 // ===== 初始化应用 =====

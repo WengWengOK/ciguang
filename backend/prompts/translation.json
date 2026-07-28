@@ -1,0 +1,31 @@
+{
+  "name": "翻译评判",
+  "description": "考研英语翻译练习的 AI 评分与点评，从准确性、流畅性、完整性三个维度打分并给出修改建议",
+  "source": "routes/ai.js - POST /api/ai/translation/evaluate",
+  "system_prompt": "你是一位资深的英语翻译评分专家。请对以下学生的翻译进行评分和点评。",
+  "user_prompt_template": "原文：{{source_text}}\n参考译文：{{reference_translation}}\n学生译文：{{user_translation}}\n\n请按以下格式输出：\n1. 总分（0-100分）\n2. 准确性评分（0-40分）：是否准确传达原文意思\n3. 流畅性评分（0-30分）：中文表达是否自然流畅\n4. 完整性评分（0-30分）：是否遗漏重要信息\n5. 详细点评：指出优点和需要改进的地方\n6. 修改建议：给出优化后的译文\n\n请以JSON格式输出：{\"score\": 总分, \"accuracy\": 准确性分, \"fluency\": 流畅性分, \"completeness\": 完整性分, \"feedback\": \"点评\", \"suggestion\": \"修改建议\"}",
+  "variables": [
+    {
+      "name": "source_text",
+      "description": "待翻译的英文原文",
+      "required": true
+    },
+    {
+      "name": "reference_translation",
+      "description": "参考译文，若无则传入'无'",
+      "required": false,
+      "default": "无"
+    },
+    {
+      "name": "user_translation",
+      "description": "学生提交的中文译文",
+      "required": true
+    }
+  ],
+  "params": {
+    "temperature": 0.3,
+    "max_tokens": 1000,
+    "model": "deepseek-chat"
+  },
+  "output_format": "JSON: {\"score\": number, \"accuracy\": number, \"fluency\": number, \"completeness\": number, \"feedback\": string, \"suggestion\": string}"
+}

@@ -14,46 +14,24 @@
             <span class="brand-text">词光</span>
         </div>
         <div class="nav-tabs">
-            <button class="nav-tab active" data-page="collection">
-                <span>🎨</span> 收藏室
+            <button class="nav-tab active" data-category="home" data-page="home">
+                <span>🏠</span> 学习中心
             </button>
-            <button class="nav-tab" data-page="practice">
-                <span>✏️</span> 例句练习
+            <button class="nav-tab" data-category="practice" data-page="practice">
+                <span>✏️</span> 练习
             </button>
-            <button class="nav-tab" data-page="reading">
-                <span>📖</span> 阅读练习
-            </button>
-            <button class="nav-tab" data-page="translation">
-                <span>🌐</span> 翻译练习
-            </button>
-            <button class="nav-tab" data-page="cloze">
-                <span>📝</span> 选词填空
-            </button>
-            <button class="nav-tab" data-page="writing">
-                <span>✍️</span> 作文练习
-            </button>
-            <button class="nav-tab" data-page="memory">
-                <span>🧠</span> 记忆
-            </button>
-            <button class="nav-tab" data-page="saved">
-                <span>💾</span> 已保存
-            </button>
-            <button class="nav-tab" data-page="wrong">
-                <span>❌</span> 错题本
-            </button>
-            <button class="nav-tab" data-page="review">
+            <button class="nav-tab" data-category="review" data-page="review">
                 <span>🔄</span> 复习
             </button>
-            <button class="nav-tab" data-page="stats">
-                <span>📊</span> 统计
+            <button class="nav-tab" data-category="insights" data-page="stats">
+                <span>📊</span> 数据
             </button>
-            <button class="nav-tab" data-page="exam">
-                <span>📋</span> 试卷分析
-            </button>
-            <button class="nav-tab" data-page="report">
-                <span>📑</span> 学习报告
+            <button class="nav-tab" data-category="collection" data-page="collection">
+                <span>📚</span> 词汇
             </button>
         </div>
+        <!-- 二级子导航 -->
+        <div class="nav-subtabs hidden" id="nav-subtabs"></div>
         <div class="nav-info">
             <span class="total-words">📚 0 个单词</span>
             <div class="auth-section" id="auth-section">
@@ -154,8 +132,127 @@
 
     <!-- 主内容区 -->
     <main class="main-content">
+        <!-- ===== 学习中心首页 ===== -->
+        <section id="home-page" class="page active">
+            <div class="home-container">
+                <!-- 欢迎横幅 -->
+                <div class="home-welcome-banner" id="home-welcome-banner">
+                    <div class="welcome-text">
+                        <h1 class="welcome-title" id="welcome-title">👋 欢迎来到词光</h1>
+                        <p class="welcome-subtitle" id="welcome-subtitle">考研英语智能学习平台 · 开始你的提分之旅</p>
+                    </div>
+                    <div class="welcome-date" id="welcome-date"></div>
+                </div>
+
+                <!-- 今日概览卡片 -->
+                <div class="home-stats-row" id="home-stats-row">
+                    <div class="home-stat-card" onclick="app.switchPage('practice')">
+                        <div class="stat-card-icon">📝</div>
+                        <div class="stat-card-body">
+                            <div class="stat-card-value" id="home-today-count">0</div>
+                            <div class="stat-card-label">今日答题</div>
+                        </div>
+                    </div>
+                    <div class="home-stat-card" onclick="app.switchPage('review')">
+                        <div class="stat-card-icon">🔄</div>
+                        <div class="stat-card-body">
+                            <div class="stat-card-value" id="home-review-count">0</div>
+                            <div class="stat-card-label">待复习</div>
+                        </div>
+                    </div>
+                    <div class="home-stat-card" onclick="app.switchPage('insights')">
+                        <div class="stat-card-icon">🔥</div>
+                        <div class="stat-card-body">
+                            <div class="stat-card-value" id="home-streak">0</div>
+                            <div class="stat-card-label">连续天数</div>
+                        </div>
+                    </div>
+                    <div class="home-stat-card" onclick="app.switchPage('insights')">
+                        <div class="stat-card-icon">🎯</div>
+                        <div class="stat-card-body">
+                            <div class="stat-card-value" id="home-predict-score">--</div>
+                            <div class="stat-card-label">预测分数</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 快捷入口 -->
+                <div class="home-section">
+                    <h3 class="home-section-title">🚀 快捷入口</h3>
+                    <div class="home-quick-grid">
+                        <div class="quick-action-card" onclick="app.switchPage('practice')">
+                            <div class="quick-action-icon">✏️</div>
+                            <div class="quick-action-name">例句练习</div>
+                            <div class="quick-action-desc">AI出题 · 即时评分</div>
+                        </div>
+                        <div class="quick-action-card" onclick="app.switchPage('reading')">
+                            <div class="quick-action-icon">📖</div>
+                            <div class="quick-action-name">阅读理解</div>
+                            <div class="quick-action-desc">AI生成文章 · 智能出题</div>
+                        </div>
+                        <div class="quick-action-card" onclick="app.switchPage('translation')">
+                            <div class="quick-action-icon">🌐</div>
+                            <div class="quick-action-name">翻译练习</div>
+                            <div class="quick-action-desc">中英互译 · AI批改</div>
+                        </div>
+                        <div class="quick-action-card" onclick="app.switchPage('speaking')">
+                            <div class="quick-action-icon">🗣️</div>
+                            <div class="quick-action-name">口语练习</div>
+                            <div class="quick-action-desc">语音录制 · AI评测</div>
+                        </div>
+                        <div class="quick-action-card" onclick="app.switchPage('cloze')">
+                            <div class="quick-action-icon">📝</div>
+                            <div class="quick-action-name">选词填空</div>
+                            <div class="quick-action-desc">语境填空 · 巩固词汇</div>
+                        </div>
+                        <div class="quick-action-card" onclick="app.switchPage('writing')">
+                            <div class="quick-action-icon">✍️</div>
+                            <div class="quick-action-name">作文练习</div>
+                            <div class="quick-action-desc">AI批改 · 高分模板</div>
+                        </div>
+                        <div class="quick-action-card" onclick="app.switchPage('memory')">
+                            <div class="quick-action-icon">🧠</div>
+                            <div class="quick-action-name">记忆训练</div>
+                            <div class="quick-action-desc">闪卡模式 · 快速记忆</div>
+                        </div>
+                        <div class="quick-action-card" onclick="app.switchPage('exam-practice')">
+                            <div class="quick-action-icon">📋</div>
+                            <div class="quick-action-name">真题练习</div>
+                            <div class="quick-action-desc">考研真题 · 全真模拟</div>
+                        </div>
+                        <div class="quick-action-card quick-action-highlight" onclick="app.switchPage('wrong')">
+                            <div class="quick-action-icon">❌</div>
+                            <div class="quick-action-name">错题整理</div>
+                            <div class="quick-action-desc">错题管理 · AI分析</div>
+                        </div>
+                        <div class="quick-action-card" onclick="app.switchPage('collection')">
+                            <div class="quick-action-icon">📚</div>
+                            <div class="quick-action-name">词汇收藏</div>
+                            <div class="quick-action-desc">词库管理 · 分级收藏</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 复习提醒 + 能力画像 -->
+                <div class="home-dual-row">
+                    <div class="home-section home-section-half">
+                        <h3 class="home-section-title">📌 复习提醒</h3>
+                        <div class="home-review-reminder" id="home-review-reminder">
+                            <div class="reminder-loading">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="home-section home-section-half">
+                        <h3 class="home-section-title">🎯 能力画像</h3>
+                        <div class="home-profile-mini" id="home-profile-mini">
+                            <div class="reminder-loading">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- 收藏室页面 -->
-        <section id="collection-page" class="page active">
+        <section id="collection-page" class="page">
             <div class="collection-header">
                 <h1>🏛️ 我的词光</h1>
                 <p class="subtitle">每个单词都是独一无二的收藏品，通过练习让它们升级发光吧！</p>
@@ -846,8 +943,8 @@
         <section id="wrong-page" class="page">
             <div class="wrong-container">
                 <div class="wrong-header">
-                    <h1>❌ 错题本</h1>
-                    <p class="subtitle">平台精选易错题 + 个人错题管理，拍照上传纸质错题</p>
+                    <h1>📊 错题整理中心</h1>
+                    <p class="subtitle">错题分析 · 分类管理 · AI诊断 · 掌握追踪，打造你的专属错题管理平台</p>
                 </div>
 
                 <!-- 主分区Tab -->
@@ -857,6 +954,9 @@
                     </button>
                     <button class="wrong-main-tab" data-wrong-tab="personal">
                         <span>📝</span> 我的错题
+                    </button>
+                    <button class="wrong-main-tab" data-wrong-tab="analysis">
+                        <span>📊</span> 错题分析
                     </button>
                 </div>
 
@@ -876,6 +976,11 @@
                 <!-- ===== 个人错题区 ===== -->
                 <div class="wrong-tab-content" id="wrong-personal-content">
                     <div class="wrong-personal-toolbar">
+                        <!-- 搜索栏 -->
+                        <div class="wrong-search-bar">
+                            <input type="text" id="wrong-search-input" class="wrong-search-input" placeholder="🔍 搜索错题关键词..." oninput="app.searchWrongRecords(this.value)">
+                        </div>
+                        <!-- 掌握状态筛选 -->
                         <div class="wrong-filter">
                             <button class="wrong-filter-btn active" data-filter="all">全部</button>
                             <button class="wrong-filter-btn" data-filter="practice">例句</button>
@@ -883,14 +988,37 @@
                             <button class="wrong-filter-btn" data-filter="cloze">选词</button>
                             <button class="wrong-filter-btn" data-filter="memory">记忆</button>
                             <button class="wrong-filter-btn" data-filter="photo">📷 拍照</button>
+                            <button class="wrong-filter-btn wrong-filter-mastery" data-filter="unmastered">🔴 未掌握</button>
+                            <button class="wrong-filter-btn wrong-filter-mastery" data-filter="reviewing">🟡 复习中</button>
+                            <button class="wrong-filter-btn wrong-filter-mastery" data-filter="mastered">🟢 已掌握</button>
                         </div>
                         <div class="wrong-personal-actions">
                             <button class="btn-photo-upload" id="btn-photo-upload">📷 拍照上传</button>
                             <button class="btn-manual-add" id="btn-manual-add">✏️ 手动添加</button>
                             <button class="btn-ai-analysis" id="btn-ai-analysis">🤖 AI分析</button>
+                            <button class="btn-batch-mode" id="btn-batch-mode" onclick="app.toggleBatchMode()">☑️ 批量管理</button>
+                            <button class="btn-export-wrong" id="btn-export-wrong" onclick="app.exportWrongRecords()">📤 导出错题</button>
                             <button class="btn-action" id="btn-clear-wrong">🗑️ 清空</button>
                         </div>
                     </div>
+
+                    <!-- 批量操作工具栏 -->
+                    <div class="wrong-batch-toolbar" id="wrong-batch-toolbar" style="display:none;">
+                        <div class="wrong-batch-info">
+                            <label class="wrong-batch-select-all">
+                                <input type="checkbox" id="wrong-select-all" onchange="app.toggleSelectAllWrong(this.checked)">
+                                <span>全选</span>
+                            </label>
+                            <span class="wrong-batch-count" id="wrong-batch-count">已选 0 项</span>
+                        </div>
+                        <div class="wrong-batch-actions">
+                            <button class="btn-batch-action" onclick="app.batchSetMastery('reviewing')">🟡 标记复习中</button>
+                            <button class="btn-batch-action" onclick="app.batchSetMastery('mastered')">🟢 标记已掌握</button>
+                            <button class="btn-batch-action" onclick="app.batchAddToReview()">📌 加入复习</button>
+                            <button class="btn-batch-action btn-batch-delete" onclick="app.batchDeleteWrong()">🗑️ 删除选中</button>
+                        </div>
+                    </div>
+
                     <div class="wrong-stats" id="wrong-stats">
                         <div class="wrong-stat-card">
                             <span class="wrong-stat-number" id="wrong-total">0</span>
@@ -923,6 +1051,302 @@
                             <p>暂无错题，继续保持！</p>
                         </div>
                     </div>
+                </div>
+
+                <!-- ===== 错题分析仪表板 ===== -->
+                <div class="wrong-tab-content" id="wrong-analysis-content">
+                    <!-- 掌握状态概览 -->
+                    <div class="analysis-overview" id="analysis-overview">
+                        <div class="analysis-overview-card">
+                            <div class="analysis-overview-icon">📚</div>
+                            <div class="analysis-overview-number" id="analysis-total">0</div>
+                            <div class="analysis-overview-label">总错题数</div>
+                        </div>
+                        <div class="analysis-overview-card analysis-overview-unmastered">
+                            <div class="analysis-overview-icon">🔴</div>
+                            <div class="analysis-overview-number" id="analysis-unmastered">0</div>
+                            <div class="analysis-overview-label">未掌握</div>
+                        </div>
+                        <div class="analysis-overview-card analysis-overview-reviewing">
+                            <div class="analysis-overview-icon">🟡</div>
+                            <div class="analysis-overview-number" id="analysis-reviewing">0</div>
+                            <div class="analysis-overview-label">复习中</div>
+                        </div>
+                        <div class="analysis-overview-card analysis-overview-mastered">
+                            <div class="analysis-overview-icon">🟢</div>
+                            <div class="analysis-overview-number" id="analysis-mastered">0</div>
+                            <div class="analysis-overview-label">已掌握</div>
+                        </div>
+                        <div class="analysis-overview-card analysis-overview-rate">
+                            <div class="analysis-overview-icon">📈</div>
+                            <div class="analysis-overview-number" id="analysis-master-rate">0%</div>
+                            <div class="analysis-overview-label">掌握率</div>
+                        </div>
+                    </div>
+
+                    <!-- 图表区域 -->
+                    <div class="analysis-charts-row">
+                        <!-- 题型分布 -->
+                        <div class="analysis-chart-card">
+                            <h3 class="analysis-chart-title">📋 题型分布</h3>
+                            <div class="analysis-chart-body" id="analysis-type-chart"></div>
+                        </div>
+                        <!-- 错误类型分布 -->
+                        <div class="analysis-chart-card">
+                            <h3 class="analysis-chart-title">🎯 错误类型分布</h3>
+                            <div class="analysis-chart-body" id="analysis-error-type-chart"></div>
+                        </div>
+                    </div>
+
+                    <!-- 7天趋势 -->
+                    <div class="analysis-chart-card analysis-chart-full">
+                        <h3 class="analysis-chart-title">📅 近7天错题趋势</h3>
+                        <div class="analysis-chart-body" id="analysis-trend-chart"></div>
+                    </div>
+
+                    <!-- 薄弱知识点 + 高频错词 -->
+                    <div class="analysis-charts-row">
+                        <div class="analysis-chart-card">
+                            <h3 class="analysis-chart-title">⚡ 薄弱知识点 TOP</h3>
+                            <div class="analysis-chart-body" id="analysis-weak-topics"></div>
+                        </div>
+                        <div class="analysis-chart-card">
+                            <h3 class="analysis-chart-title">🔤 高频错词 TOP</h3>
+                            <div class="analysis-chart-body" id="analysis-top-words"></div>
+                        </div>
+                    </div>
+
+                    <!-- AI学习建议 -->
+                    <div class="analysis-chart-card analysis-chart-full">
+                        <div class="analysis-suggestions-header">
+                            <h3 class="analysis-chart-title">💡 AI学习建议</h3>
+                            <button class="btn-refresh-analysis" onclick="app.renderErrorAnalysisDashboard()">🔄 刷新分析</button>
+                        </div>
+                        <div class="analysis-suggestions-body" id="analysis-suggestions"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 口语练习页面 -->
+        <section id="speaking-page" class="page">
+            <div class="speaking-container">
+                <!-- 口语话题区 -->
+                <div class="speaking-topic-section" id="speaking-topic-section">
+                    <div class="speaking-header">
+                        <h2>🗣️ AI口语练习</h2>
+                        <p class="speaking-desc">AI出题 → 语音回答 → 智能评判，补齐"说"的维度</p>
+                    </div>
+
+                    <!-- 话题分类选择 -->
+                    <div class="speaking-category-tabs">
+                        <button class="speaking-cat-btn active" data-speaking-cat="self_intro">👤 自我介绍</button>
+                        <button class="speaking-cat-btn" data-speaking-cat="social">🌍 社会话题</button>
+                        <button class="speaking-cat-btn" data-speaking-cat="academic">🎓 学术讨论</button>
+                        <button class="speaking-cat-btn" data-speaking-cat="daily">🏠 日常生活</button>
+                        <button class="speaking-cat-btn" data-speaking-cat="career">💼 职业规划</button>
+                    </div>
+
+                    <!-- 话题展示 -->
+                    <div class="speaking-topic-card" id="speaking-topic-card">
+                        <div class="speaking-topic-placeholder">
+                            <span class="speaking-topic-icon">🎤</span>
+                            <p>点击下方按钮，获取AI生成的口语话题</p>
+                        </div>
+                    </div>
+
+                    <button class="btn-generate-topic" id="btn-generate-topic" onclick="app.generateSpeakingTopic()">
+                        🎲 生成话题
+                    </button>
+                </div>
+
+                <!-- 录音回答区 -->
+                <div class="speaking-record-section" id="speaking-record-section" style="display:none;">
+                    <div class="speaking-record-header">
+                        <h3>🎙️ 语音回答</h3>
+                        <span class="speaking-timer" id="speaking-timer">00:00</span>
+                    </div>
+
+                    <!-- 录音控制 -->
+                    <div class="speaking-record-controls">
+                        <button class="btn-record-start" id="btn-record-start" onclick="app.startSpeakingRecording()">
+                            🎙️ 开始录音
+                        </button>
+                        <button class="btn-record-stop" id="btn-record-stop" onclick="app.stopSpeakingRecording()" style="display:none;">
+                            ⏹️ 停止录音
+                        </button>
+                        <button class="btn-record-play" id="btn-record-play" onclick="app.playSpeakingRecording()" style="display:none;">
+                            ▶️ 播放录音
+                        </button>
+                        <button class="btn-submit-speaking" id="btn-submit-speaking" onclick="app.submitSpeakingAnswer()" style="display:none;">
+                            📊 提交评判
+                        </button>
+                    </div>
+
+                    <!-- 录音波形 -->
+                    <div class="speaking-waveform" id="speaking-waveform" style="display:none;">
+                        <div class="waveform-bar"></div>
+                        <div class="waveform-bar"></div>
+                        <div class="waveform-bar"></div>
+                        <div class="waveform-bar"></div>
+                        <div class="waveform-bar"></div>
+                    </div>
+
+                    <!-- 手动输入降级 -->
+                    <div class="speaking-fallback-input" id="speaking-fallback-input">
+                        <div class="speaking-fallback-hint">
+                            <p>🎤 没有麦克风？可以直接打字回答：</p>
+                        </div>
+                        <textarea id="speaking-text-input" rows="4" placeholder="在这里输入你的英文回答..."></textarea>
+                        <button class="btn-text-submit" onclick="app.submitSpeakingText()">
+                            📊 提交文本评判
+                        </button>
+                    </div>
+
+                    <!-- 转写结果 -->
+                    <div class="speaking-transcription" id="speaking-transcription" style="display:none;">
+                        <div class="transcription-label">📝 语音转文字结果：</div>
+                        <div class="transcription-text" id="transcription-text"></div>
+                    </div>
+
+                    <!-- AI评判中 -->
+                    <div class="speaking-evaluating" id="speaking-evaluating" style="display:none;">
+                        <div class="evaluating-spinner"></div>
+                        <p>🤖 AI正在评判你的口语表现...</p>
+                    </div>
+                </div>
+
+                <!-- 评判结果区 -->
+                <div class="speaking-result-section" id="speaking-result-section" style="display:none;">
+                    <div class="speaking-result-header">
+                        <h3>📊 AI评判结果</h3>
+                        <div class="speaking-overall-score" id="speaking-overall-score">0</div>
+                    </div>
+
+                    <!-- 评分维度 -->
+                    <div class="speaking-scores-grid" id="speaking-scores-grid"></div>
+
+                    <!-- 统计数据 -->
+                    <div class="speaking-stats-row" id="speaking-stats-row"></div>
+
+                    <!-- 反馈详情 -->
+                    <div class="speaking-feedback" id="speaking-feedback"></div>
+
+                    <!-- 语法错误 -->
+                    <div class="speaking-errors" id="speaking-errors" style="display:none;"></div>
+
+                    <!-- 改进建议 -->
+                    <div class="speaking-suggestions" id="speaking-suggestions"></div>
+
+                    <!-- 参考范文 -->
+                    <div class="speaking-reference" id="speaking-reference"></div>
+
+                    <!-- 操作按钮 -->
+                    <div class="speaking-actions">
+                        <button class="btn-speaking-next" onclick="app.nextSpeakingRound()">
+                            🎲 换一个话题
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 真题练习页面 -->
+        <section id="exam-practice-page" class="page">
+            <div class="exam-practice-container">
+                <div class="exam-practice-header">
+                    <h1>📋 考研真题练习</h1>
+                    <p class="subtitle">全真模拟考研英语题型 · AI智能生成 · 实战演练</p>
+                </div>
+
+                <!-- 题型选择区 -->
+                <div class="exam-section-selector" id="exam-section-selector">
+                    <div class="exam-section-card" data-section="cloze" onclick="app.selectExamSection('cloze')">
+                        <div class="exam-section-icon">📝</div>
+                        <div class="exam-section-info">
+                            <div class="exam-section-name">完形填空</div>
+                            <div class="exam-section-desc">20空 · 约20分钟</div>
+                        </div>
+                    </div>
+                    <div class="exam-section-card" data-section="reading_a" onclick="app.selectExamSection('reading_a')">
+                        <div class="exam-section-icon">📖</div>
+                        <div class="exam-section-info">
+                            <div class="exam-section-name">阅读理解 Part A</div>
+                            <div class="exam-section-desc">1篇文章 · 5题</div>
+                        </div>
+                    </div>
+                    <div class="exam-section-card" data-section="reading_b" onclick="app.selectExamSection('reading_b')">
+                        <div class="exam-section-icon">🔀</div>
+                        <div class="exam-section-info">
+                            <div class="exam-section-name">新题型 Part B</div>
+                            <div class="exam-section-desc">段落匹配 · 5空</div>
+                        </div>
+                    </div>
+                    <div class="exam-section-card" data-section="reading_c" onclick="app.selectExamSection('reading_c')">
+                        <div class="exam-section-icon">🌐</div>
+                        <div class="exam-section-info">
+                            <div class="exam-section-name">翻译 Part C</div>
+                            <div class="exam-section-desc">5个长难句翻译</div>
+                        </div>
+                    </div>
+                    <div class="exam-section-card" data-section="writing_a" onclick="app.selectExamSection('writing_a')">
+                        <div class="exam-section-icon">✉️</div>
+                        <div class="exam-section-info">
+                            <div class="exam-section-name">应用文写作</div>
+                            <div class="exam-section-desc">信件/通知 · 约100词</div>
+                        </div>
+                    </div>
+                    <div class="exam-section-card" data-section="writing_b" onclick="app.selectExamSection('writing_b')">
+                        <div class="exam-section-icon">✍️</div>
+                        <div class="exam-section-info">
+                            <div class="exam-section-name">图表作文</div>
+                            <div class="exam-section-desc">图表分析 · 约200词</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 设置区 -->
+                <div class="exam-settings" id="exam-settings" style="display:none;">
+                    <div class="exam-settings-row">
+                        <label class="exam-settings-label">难度：</label>
+                        <div class="exam-difficulty-options">
+                            <button class="exam-diff-btn active" data-difficulty="easy" onclick="app.setExamDifficulty('easy')">基础</button>
+                            <button class="exam-diff-btn" data-difficulty="medium" onclick="app.setExamDifficulty('medium')">标准</button>
+                            <button class="exam-diff-btn" data-difficulty="hard" onclick="app.setExamDifficulty('hard')">冲刺</button>
+                        </div>
+                    </div>
+                    <div class="exam-settings-row">
+                        <label class="exam-settings-label">话题：</label>
+                        <select class="exam-topic-select" id="exam-topic-select">
+                            <option value="">随机话题</option>
+                            <option value="social">社会问题</option>
+                            <option value="technology">科技发展</option>
+                            <option value="education">教育</option>
+                            <option value="environment">环境</option>
+                            <option value="culture">文化</option>
+                            <option value="economy">经济</option>
+                            <option value="health">健康</option>
+                        </select>
+                    </div>
+                    <button class="btn-exam-generate" id="btn-exam-generate" onclick="app.generateExamPractice()">
+                        🚀 生成真题
+                    </button>
+                </div>
+
+                <!-- 加载中 -->
+                <div class="exam-loading" id="exam-loading" style="display:none;">
+                    <div class="spinner"></div>
+                    <p>正在生成真题，请稍候...</p>
+                </div>
+
+                <!-- 答题区 -->
+                <div class="exam-content" id="exam-content" style="display:none;">
+                    <!-- 动态渲染 -->
+                </div>
+
+                <!-- 结果区 -->
+                <div class="exam-result" id="exam-result" style="display:none;">
+                    <!-- 动态渲染 -->
                 </div>
             </div>
         </section>
@@ -1604,6 +2028,49 @@
                 </div>
             </div>
         </section>
+
+        <!-- ===== 学情预测 + 智能学习计划 ===== -->
+        <section id="prediction-page" class="page">
+            <div class="prediction-container">
+                <!-- 预测仪表盘 -->
+                <div class="prediction-dashboard" id="prediction-dashboard">
+                    <div class="prediction-loading">
+                        <div class="prediction-loading-icon">📊</div>
+                        <p>正在加载学情数据...</p>
+                    </div>
+                </div>
+
+                <!-- 学习计划生成区 -->
+                <div class="plan-generator-section" id="plan-generator-section" style="display:none;">
+                    <div class="plan-generator-card">
+                        <h3>📋 生成个性化学习计划</h3>
+                        <p class="plan-generator-desc">基于你的学情画像，AI将为你制定分阶段、可执行的学习计划</p>
+                        <div class="plan-generator-form">
+                            <div class="plan-form-row">
+                                <div class="plan-form-group">
+                                    <label>考试日期</label>
+                                    <input type="date" id="plan-exam-date" />
+                                </div>
+                                <div class="plan-form-group">
+                                    <label>每日学习时长（小时）</label>
+                                    <input type="number" id="plan-daily-hours" min="1" max="12" value="3" />
+                                </div>
+                                <div class="plan-form-group">
+                                    <label>目标分数</label>
+                                    <input type="number" id="plan-target-score" min="40" max="100" value="75" />
+                                </div>
+                            </div>
+                            <button class="btn-generate-plan" id="btn-generate-plan" onclick="app.generateStudyPlan()">
+                                <span>✨ 生成AI学习计划</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 学习计划展示区 -->
+                <div class="study-plan-display" id="study-plan-display" style="display:none;"></div>
+            </div>
+        </section>
     </main>
 
     <!-- 设置弹窗 -->
@@ -1772,5 +2239,123 @@
             }
         }
     </script>
+
+    <!-- ===== AI学习导师浮动按钮 + 聊天面板 ===== -->
+    <!-- 浮动按钮 -->
+    <button class="tutor-fab" id="tutor-fab" onclick="app.toggleTutorPanel()">
+        <span class="tutor-fab-icon">💬</span>
+        <span class="tutor-fab-pulse"></span>
+    </button>
+
+    <!-- 聊天面板 -->
+    <div class="tutor-panel" id="tutor-panel">
+        <!-- 面板头部 -->
+        <div class="tutor-panel-header">
+            <div class="tutor-header-info">
+                <span class="tutor-avatar">🤖</span>
+                <div>
+                    <div class="tutor-title">AI学习导师</div>
+                    <div class="tutor-status" id="tutor-status">在线 · 基于你的学情画像</div>
+                </div>
+            </div>
+            <div class="tutor-header-actions">
+                <button class="tutor-btn-clear" onclick="app.clearTutorChat()" title="清除对话">🗑️</button>
+                <button class="tutor-btn-close" onclick="app.toggleTutorPanel()" title="关闭">✕</button>
+            </div>
+        </div>
+
+        <!-- 消息区域 -->
+        <div class="tutor-messages" id="tutor-messages">
+            <!-- 欢迎消息 -->
+            <div class="tutor-msg tutor-msg-bot">
+                <div class="tutor-msg-avatar">🤖</div>
+                <div class="tutor-msg-bubble">
+                    <p>你好！我是你的AI英语学习导师 👋</p>
+                    <p>我可以基于你的学情画像，帮你解答词汇、语法、阅读、翻译、写作等问题，还能制定个性化学习计划。</p>
+                    <p class="tutor-welcome-hint">试试问我：</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 快捷问题模板 -->
+        <div class="tutor-quick-templates" id="tutor-quick-templates">
+            <button class="tutor-quick-btn" onclick="app.sendQuickQuestion('abandon怎么记？')">💡 这个词怎么记？</button>
+            <button class="tutor-quick-btn" onclick="app.sendQuickQuestion('定语从句怎么用？')">📝 这个语法怎么用？</button>
+            <button class="tutor-quick-btn" onclick="app.sendQuickQuestion('阅读总是做不完怎么办？')">📖 阅读技巧</button>
+            <button class="tutor-quick-btn" onclick="app.sendQuickQuestion('帮我制定复习计划')">📅 制定计划</button>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="tutor-input-area">
+            <textarea
+                id="tutor-input"
+                class="tutor-input"
+                placeholder="输入你的问题..."
+                rows="1"
+                onkeydown="app.handleTutorInputKey(event)"
+            ></textarea>
+            <button class="tutor-btn-send" id="tutor-btn-send" onclick="app.sendTutorMessage()">
+                <span>发送</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 聊天面板遮罩（移动端） -->
+    <div class="tutor-overlay" id="tutor-overlay" onclick="app.toggleTutorPanel()"></div>
+
+    <!-- ===== 错题库对话Agent浮动按钮 + 聊天面板 ===== -->
+    <button class="error-agent-fab" id="error-agent-fab" onclick="app.toggleErrorAgentPanel()">
+        <span class="error-agent-fab-icon">🔍</span>
+        <span class="error-agent-fab-pulse"></span>
+    </button>
+
+    <div class="error-agent-panel" id="error-agent-panel">
+        <div class="error-agent-panel-header">
+            <div class="error-agent-header-info">
+                <span class="error-agent-avatar">🔍</span>
+                <div>
+                    <div class="error-agent-title">错题分析助手</div>
+                    <div class="error-agent-status" id="error-agent-status">在线 · 基于你的错题库</div>
+                </div>
+            </div>
+            <div class="error-agent-header-actions">
+                <button class="error-agent-btn-clear" onclick="app.clearErrorAgentChat()" title="清除对话">🗑️</button>
+                <button class="error-agent-btn-close" onclick="app.toggleErrorAgentPanel()" title="关闭">✕</button>
+            </div>
+        </div>
+
+        <div class="error-agent-messages" id="error-agent-messages">
+            <div class="error-agent-msg error-agent-msg-bot">
+                <div class="error-agent-msg-avatar">🔍</div>
+                <div class="error-agent-msg-bubble">
+                    <p>你好！我是错题分析助手 📊</p>
+                    <p>我可以帮你分析错题规律、诊断薄弱知识点、生成针对性练习题。</p>
+                    <p class="error-agent-welcome-hint">试试问我：</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="error-agent-quick-templates" id="error-agent-quick-templates">
+            <button class="error-agent-quick-btn" onclick="app.sendErrorQuickQuestion('分析我的错题')">📊 分析错题</button>
+            <button class="error-agent-quick-btn" onclick="app.sendErrorQuickQuestion('我的薄弱知识点是什么')">🎯 薄弱知识点</button>
+            <button class="error-agent-quick-btn" onclick="app.sendErrorQuickQuestion('帮我出几道练习题')">📝 出题练习</button>
+            <button class="error-agent-quick-btn" onclick="app.sendErrorQuickQuestion('给我一些学习建议')">💡 学习建议</button>
+        </div>
+
+        <div class="error-agent-input-area">
+            <textarea
+                id="error-agent-input"
+                class="error-agent-input"
+                placeholder="输入你的问题..."
+                rows="1"
+                onkeydown="app.handleErrorAgentInputKey(event)"
+            ></textarea>
+            <button class="error-agent-btn-send" id="error-agent-btn-send" onclick="app.sendErrorAgentMessage()">
+                <span>发送</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="error-agent-overlay" id="error-agent-overlay" onclick="app.toggleErrorAgentPanel()"></div>
 </body>
 </html>

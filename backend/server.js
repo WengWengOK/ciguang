@@ -34,6 +34,13 @@ app.use('/api/ai', require('./routes/ai'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/user', require('./routes/profile'));
 app.use('/api/review', require('./routes/review'));
+app.use('/api/agent', require('./routes/tutor'));
+app.use('/api/predict', require('./routes/predict'));
+app.use('/api/exam-practice', require('./routes/exam-practice'));
+app.use('/api/error-agent', require('./routes/error-agent'));
+app.use('/api/rag', require('./routes/rag'));
+app.use('/api/stream', require('./routes/stream'));
+app.use('/api/study-agent', require('./routes/study-agent'));
 
 // 健康检查
 app.get('/api/health', (req, res) => {
@@ -86,6 +93,8 @@ app.get('/api', (req, res) => {
                 'POST /api/ai/chat': '统一AI文本生成代理（前端所有AI调用通过此接口）',
                 'POST /api/ai/multimodal': '统一多模态AI代理（图片+文本分析）',
                 'POST /api/ai/ocr-analyze': '错题OCR识别 + AI归因分析（图片→文本→错误归因→变体题）',
+                'POST /api/ai/speaking/generate': 'AI生成口语练习话题',
+                'POST /api/ai/speaking/evaluate': 'AI评判口语回答（流利度/语法/内容/词汇/发音）',
                 'POST /api/ai/translation/evaluate': 'AI翻译评判',
                 'POST /api/ai/generate-example': 'AI生成例句',
                 'POST /api/ai/exam/analyze': 'AI试卷智能分析（上传试卷图片，分析学生情况）'
@@ -102,6 +111,30 @@ app.get('/api', (req, res) => {
                 'POST /api/user/profile/update': '更新能力画像（答题后调用）',
                 'GET /api/user/skills/:dimension': '获取指定维度的知识点掌握情况',
                 'POST /api/user/profile/reset': '重置能力画像'
+            },
+            agent: {
+                'POST /api/agent/tutor/chat': 'AI学习导师对话（基于学情画像的个性化答疑）',
+                'POST /api/agent/tutor/clear': '清除导师会话历史'
+            },
+            predict: {
+                'GET /api/predict/forecast': '获取学情预测数据（预测分数/等级/趋势/提升空间）',
+                'POST /api/predict/plan': '生成AI学习计划（分阶段/每日安排/周目标）'
+            },
+            stream: {
+                'POST /api/stream/tutor': 'AI学习导师流式对话（SSE逐字输出）',
+                'POST /api/stream/error-agent': '错题分析Agent流式对话（SSE逐字输出）',
+                'GET /api/stream/metrics': 'AI调用可观测性数据（token统计/耗时/成功率）'
+            },
+            rag: {
+                'POST /api/rag/index': '索引单词到向量数据库（需登录）',
+                'POST /api/rag/search': '搜索相关知识（语义检索，需登录）',
+                'GET /api/rag/stats': '获取向量索引统计（需登录）',
+                'POST /api/rag/build-context': '构建RAG上下文（需登录）'
+            },
+            'study-agent': {
+                'POST /api/study-agent/run': 'ReAct智能体同步执行（think+act多步推理+工具调用）',
+                'POST /api/study-agent/run-stream': 'ReAct智能体SSE流式执行（逐步推送推理过程）',
+                'GET /api/study-agent/tools': '获取智能体可用工具列表'
             }
         }
     });
@@ -121,11 +154,15 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`=================================`);
-    console.log(`词光后端服务已启动`);
-    console.log(`监听端口: ${PORT}`);
-    console.log(`API地址: http://localhost:${PORT}/api`);
-    console.log(`健康检查: http://localhost:${PORT}/api/health`);
-    console.log(`=================================`);
-});
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`=================================`);
+        console.log(`词光后端服务已启动`);
+        console.log(`监听端口: ${PORT}`);
+        console.log(`API地址: http://localhost:${PORT}/api`);
+        console.log(`健康检查: http://localhost:${PORT}/api/health`);
+        console.log(`=================================`);
+    });
+}
+
+module.exports = app;

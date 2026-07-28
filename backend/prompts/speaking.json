@@ -1,0 +1,37 @@
+{
+  "name": "口语评判",
+  "description": "考研英语口语回答的 AI 评判，从流利度、语法、内容、词汇、发音五个维度评分并给出详细反馈、错误修正和参考范文",
+  "source": "routes/ai.js - POST /api/ai/speaking/evaluate",
+  "system_prompt": "你是一位专业的考研英语口语考官。请评判以下学生的口语回答。",
+  "user_prompt_template": "话题：{{topic}}\n学生回答（语音转文字）：{{transcription}}\n回答时长：{{durationSec}}秒\n语速：{{wordsPerMin}}词/分钟\n\n请从以下维度评分（每项0-100分），并给出详细反馈：\n\n1. 流利度（Fluency）：语速、停顿、连贯性\n2. 语法（Grammar）：语法正确性、句式多样性\n3. 内容（Content）：观点相关性、论据充分性、逻辑性\n4. 词汇（Vocabulary）：词汇多样性、用词准确性\n5. 发音预估（Pronunciation）：基于转写文本的发音可读性评估\n\n请以JSON格式输出：\n{\n  \"scores\": {\n    \"fluency\": 分数,\n    \"grammar\": 分数,\n    \"content\": 分数,\n    \"vocabulary\": 分数,\n    \"pronunciation\": 分数\n  },\n  \"overall\": 总分,\n  \"feedback\": {\n    \"fluency\": \"流利度反馈\",\n    \"grammar\": \"语法反馈（指出具体错误）\",\n    \"content\": \"内容反馈\",\n    \"vocabulary\": \"词汇反馈\"\n  },\n  \"errors\": [\n    {\"original\": \"原句\", \"correction\": \"修正\", \"type\": \"grammar/vocabulary\"}\n  ],\n  \"suggestions\": [\"改进建议1\", \"改进建议2\"],\n  \"referenceAnswer\": \"AI生成的参考范文（优秀回答示例）\"\n}",
+  "variables": [
+    {
+      "name": "topic",
+      "description": "口语话题，若未指定则传入'未指定'",
+      "required": false,
+      "default": "未指定"
+    },
+    {
+      "name": "transcription",
+      "description": "学生口语回答的语音转文字结果",
+      "required": true
+    },
+    {
+      "name": "durationSec",
+      "description": "回答时长（秒），默认120",
+      "required": false,
+      "default": 120
+    },
+    {
+      "name": "wordsPerMin",
+      "description": "语速（词/分钟），由后端根据字数和时长计算",
+      "required": true
+    }
+  ],
+  "params": {
+    "temperature": 0.3,
+    "max_tokens": 2000,
+    "model": "deepseek-chat"
+  },
+  "output_format": "JSON: {\"scores\": {fluency,grammar,content,vocabulary,pronunciation}, \"overall\": number, \"feedback\": {fluency,grammar,content,vocabulary}, \"errors\": [{original,correction,type}], \"suggestions\": [string], \"referenceAnswer\": string}"
+}

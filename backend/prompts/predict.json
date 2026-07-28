@@ -1,0 +1,65 @@
+{
+  "name": "学情预测",
+  "description": "考研英语学习规划专家，基于用户学情画像（综合得分、各维度、薄弱知识点）和计划参数（距考天数、每日时长、目标分数）生成个性化分阶段学习计划",
+  "source": "routes/predict.js - POST /api/predict/plan",
+  "system_prompt": "",
+  "user_prompt_template": "你是考研英语学习规划专家。请根据以下用户学情，生成一份个性化学习计划。\n\n## 用户学情\n- 综合得分：{{overallScore}}/100\n- 正确率：{{accuracy}}%\n- 总答题数：{{totalAnswers}}\n- 各维度：{{dimStr}}\n- 薄弱知识点：{{weakStr}}\n\n## 计划参数\n- 距考试天数：{{daysToExam}}天\n- 每日学习时长：{{hoursPerDay}}小时\n- 目标分数：{{target}}分\n\n## 请生成以下内容（JSON格式）：\n{\n  \"summary\": \"一句话总结当前学情和目标差距\",\n  \"phases\": [\n    {\n      \"name\": \"阶段名称（如：基础巩固期）\",\n      \"duration\": \"持续时间（如：第1-4周）\",\n      \"focus\": \"本阶段重点\",\n      \"tasks\": [\"具体任务1\", \"具体任务2\", \"具体任务3\"],\n      \"dailySchedule\": [\n        {\"time\": \"时间段\", \"task\": \"学习任务\", \"duration\": \"时长\"}\n      ]\n    }\n  ],\n  \"weeklyGoals\": [\"每周目标1\", \"每周目标2\", \"每周目标3\"],\n  \"tips\": [\"学习建议1\", \"学习建议2\", \"学习建议3\"],\n  \"predictedProgress\": \"预计完成计划后的提升幅度\"\n}\n\n要求：\n1. 计划分2-3个阶段，从基础到冲刺\n2. 每日任务要具体可执行\n3. 优先安排薄弱维度的练习\n4. 结合艾宾浩斯复习曲线安排复习\n5. JSON格式严格，不要有多余文本",
+  "variables": [
+    {
+      "name": "overallScore",
+      "description": "用户综合得分（0-100）",
+      "required": true
+    },
+    {
+      "name": "accuracy",
+      "description": "用户总体正确率（百分比）",
+      "required": true
+    },
+    {
+      "name": "totalAnswers",
+      "description": "用户累计答题总数",
+      "required": true
+    },
+    {
+      "name": "dimStr",
+      "description": "各维度得分摘要，格式如：词汇量:70，语法掌握:65，阅读理解:80，翻译能力:72，写作水平:75",
+      "required": true
+    },
+    {
+      "name": "weakStr",
+      "description": "薄弱知识点摘要，格式如：词汇量的词根词缀（正确率45%）；语法掌握的虚拟语气（正确率50%）。若无则为'暂无明显薄弱知识点'",
+      "required": true
+    },
+    {
+      "name": "daysToExam",
+      "description": "距离考试天数，默认120",
+      "required": true,
+      "default": 120
+    },
+    {
+      "name": "hoursPerDay",
+      "description": "每日学习时长（小时），默认3",
+      "required": true,
+      "default": 3
+    },
+    {
+      "name": "target",
+      "description": "目标分数，默认为综合得分+15（上限85）",
+      "required": true,
+      "default": 85
+    }
+  ],
+  "dimension_labels": {
+    "vocabulary": "词汇量",
+    "grammar": "语法掌握",
+    "reading": "阅读理解",
+    "translation": "翻译能力",
+    "writing": "写作水平"
+  },
+  "params": {
+    "temperature": 0.6,
+    "max_tokens": 2000,
+    "model": "qwen-turbo"
+  },
+  "output_format": "JSON: {\"summary\": string, \"phases\": [{name, duration, focus, tasks[], dailySchedule[]}], \"weeklyGoals\": [string], \"tips\": [string], \"predictedProgress\": string}"
+}

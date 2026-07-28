@@ -505,6 +505,295 @@ router.post('/ocr-analyze', aiRateLimit, async (req, res) => {
     }
 });
 
+// ===== AI口语练习模块 =====
+
+// 生成口语话题
+router.post('/speaking/generate', aiRateLimit, async (req, res) => {
+    try {
+        const { category } = req.body;
+
+        const categories = {
+            self_intro: '个人介绍类（如描述家乡、兴趣爱好、个人经历）',
+            social: '社会话题类（如环保问题、科技发展、教育公平）',
+            academic: '学术讨论类（如研究方法、学术论文复述、学术观点表达）',
+            daily: '日常生活类（如购物体验、旅行计划、饮食习惯）',
+            career: '职业规划类（如考研动机、未来职业规划、实习经历）'
+        };
+
+        const topicCategory = categories[category] || '考研英语口语话题';
+
+        const apiKey = process.env.DASHSCOPE_API_KEY || process.env.DEEPSEEK_API_KEY;
+
+        if (!apiKey) {
+            // 无API Key时返回预设话题
+            const fallbackTopics = [
+                { topic: 'Describe your hometown and what makes it special.', category: 'self_intro', tips: 'Try to include geographical location, local culture, and personal feelings.' },
+                { topic: 'Discuss the impact of technology on education.', category: 'social', tips: 'Consider both positive and negative effects with examples.' },
+                { topic: 'Why did you choose to pursue postgraduate studies?', category: 'career', tips: 'Explain your academic interests and career goals.' },
+                { topic: 'Describe a book that influenced you deeply.', category: 'self_intro', tips: 'Include the main theme and how it changed your perspective.' },
+                { topic: 'What are the advantages and disadvantages of social media?', category: 'social', tips: 'Provide balanced arguments with specific examples.' }
+            ];
+            const random = fallbackTopics[Math.floor(Math.random() * fallbackTopics.length)];
+            return res.json({ success: true, data: { ...random, fallback: true } });
+        }
+
+        const prompt = `你是一个考研英语口语考试出题专家。请生成一道${topicCategory}的口语话题。
+
+要求：
+1. 话题适合考研复试口语水平
+2. 话题表述用英文，清晰简洁
+3. 给出回答提示（中英文均可）
+4. 预估回答时长约2-3分钟
+
+请以JSON格式输出：
+{"topic": "英文话题", "category": "${category || 'general'}", "tips": "回答提示", "estimatedTime": "2-3分钟"}`;
+
+        const response = await axios.post(
+            process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions',
+            {
+                model: 'deepseek-chat',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.8,
+                max_tokens: 500
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
+
+        let content = response.data.choices?.[0]?.message?.content || '';
+        let result;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try { result = JSON.parse(jsonMatch[0]); }
+            catch (e) { result = { topic: content, tips: '', fallback: true }; }
+        } else {
+            result = { topic: content, tips: '', fallback: true };
+        }
+
+        res.json({ success: true, data: result });
+    } catch (err) {
+        console.error('生成口语话题失败:', err.message);
+        res.json({
+            success: true,
+            data: { topic: 'Describe a challenge you faced and how you overcame it.', tips: 'Use specific examples and reflect on what you learned.', fallback: true }
+        });
+    }
+});
+
+// 评判口语回答
+router.post('/speaking/evaluate', aiRateLimit, async (req, res) => {
+    try {
+        const { topic, transcription, duration } = req.body;
+
+        if (!transcription) {
+            return res.status(400).json({ success: false, message: '缺少转写文本' });
+        }
+
+        const apiKey = process.env.DASHSCOPE_API_KEY || process.env.DEEPSEEK_API_KEY;
+
+        // 计算流利度指标
+        const wordCount = transcription.split(/\s+/).filter(w => w.length > 0).length;
+        const durationSec = duration || 120;
+        const wordsPerMin = Math.round((wordCount / durationSec) * 60);
+
+        if (!apiKey) {
+            // 无API Key时使用本地规则评判
+            const localResult = evaluateSpeakingLocal(topic, transcription, wordCount, wordsPerMin, durationSec);
+            return res.json({ success: true, data: { ...localResult, fallback: true } });
+        }
+
+        const prompt = `你是一位专业的考研英语口语考官。请评判以下学生的口语回答。
+
+话题：${topic || '未指定'}
+学生回答（语音转文字）：${transcription}
+回答时长：${durationSec}秒
+语速：${wordsPerMin}词/分钟
+
+请从以下维度评分（每项0-100分），并给出详细反馈：
+
+1. 流利度（Fluency）：语速、停顿、连贯性
+2. 语法（Grammar）：语法正确性、句式多样性
+3. 内容（Content）：观点相关性、论据充分性、逻辑性
+4. 词汇（Vocabulary）：词汇多样性、用词准确性
+5. 发音预估（Pronunciation）：基于转写文本的发音可读性评估
+
+请以JSON格式输出：
+{
+  "scores": {
+    "fluency": 分数,
+    "grammar": 分数,
+    "content": 分数,
+    "vocabulary": 分数,
+    "pronunciation": 分数
+  },
+  "overall": 总分,
+  "feedback": {
+    "fluency": "流利度反馈",
+    "grammar": "语法反馈（指出具体错误）",
+    "content": "内容反馈",
+    "vocabulary": "词汇反馈"
+  },
+  "errors": [
+    {"original": "原句", "correction": "修正", "type": "grammar/vocabulary"}
+  ],
+  "suggestions": ["改进建议1", "改进建议2"],
+  "referenceAnswer": "AI生成的参考范文（优秀回答示例）"
+}`;
+
+        const response = await axios.post(
+            process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions',
+            {
+                model: 'deepseek-chat',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.3,
+                max_tokens: 2000
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 60000
+            }
+        );
+
+        let content = response.data.choices?.[0]?.message?.content || '';
+        let result;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try { result = JSON.parse(jsonMatch[0]); }
+            catch (e) {
+                const cleaned = jsonMatch[0].replace(/[\x00-\x1f]/g, '').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+                result = JSON.parse(cleaned);
+            }
+        } else {
+            result = evaluateSpeakingLocal(topic, transcription, wordCount, wordsPerMin, durationSec);
+            result.rawResponse = content;
+        }
+
+        // 补充本地计算的流利度数据
+        if (!result.wordStats) {
+            result.wordStats = { wordCount, durationSec, wordsPerMin };
+        }
+
+        res.json({ success: true, data: result });
+    } catch (err) {
+        console.error('口语评判失败:', err.message);
+        const wordCount = (req.body.transcription || '').split(/\s+/).filter(w => w.length > 0).length;
+        const localResult = evaluateSpeakingLocal(req.body.topic, req.body.transcription, wordCount, 100, req.body.duration || 120);
+        res.json({ success: true, data: { ...localResult, fallback: true } });
+    }
+});
+
+// 本地口语评判引擎（降级方案）
+function evaluateSpeakingLocal(topic, transcription, wordCount, wordsPerMin, durationSec) {
+    let fluencyScore = 60;
+    let grammarScore = 60;
+    let contentScore = 60;
+    let vocabScore = 55;
+    let pronScore = 60;
+
+    const feedback = {};
+    const errors = [];
+
+    // 流利度评估
+    if (wordsPerMin >= 100 && wordsPerMin <= 160) {
+        fluencyScore = 80;
+        feedback.fluency = '语速适中，表达较为流畅';
+    } else if (wordsPerMin < 60) {
+        fluencyScore = 45;
+        feedback.fluency = '语速偏慢，建议增加练习提高流畅度';
+    } else if (wordsPerMin > 180) {
+        fluencyScore = 65;
+        feedback.fluency = '语速偏快，注意控制节奏和清晰度';
+    } else {
+        fluencyScore = 70;
+        feedback.fluency = '语速基本正常，继续练习保持流畅';
+    }
+
+    // 语法评估（简单规则）
+    const sentences = transcription.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const avgSentenceLen = sentences.length > 0 ? wordCount / sentences.length : 0;
+
+    // 检查常见语法错误
+    const lowerText = transcription.toLowerCase();
+    if (/\bi\s /.test(lowerText) && !/\bI\s /.test(transcription)) {
+        errors.push({ original: 'i', correction: 'I', type: 'grammar' });
+    }
+    if (/\bhe\s+don\b/i.test(transcription)) {
+        errors.push({ original: 'he don\'t', correction: 'he doesn\'t', type: 'grammar' });
+    }
+
+    if (avgSentenceLen > 5 && avgSentenceLen < 25) {
+        grammarScore = 70;
+        feedback.grammar = '句子长度适中，基本语法结构正确';
+    } else if (avgSentenceLen >= 25) {
+        grammarScore = 55;
+        feedback.grammar = '部分句子过长，建议拆分以提升可读性';
+    } else {
+        grammarScore = 50;
+        feedback.grammar = '句子过短，建议使用更丰富的句式结构';
+    }
+    if (errors.length > 0) {
+        grammarScore -= 10;
+    }
+
+    // 内容评估
+    if (wordCount > 50) {
+        contentScore = 72;
+        feedback.content = '回答内容充实，表达了较多信息';
+    } else if (wordCount > 20) {
+        contentScore = 60;
+        feedback.content = '回答基本涵盖话题，建议补充更多细节';
+    } else {
+        contentScore = 40;
+        feedback.content = '回答过于简短，需要展开更多内容';
+    }
+
+    // 词汇评估
+    const uniqueWords = new Set(transcription.toLowerCase().match(/[a-z]+/g) || []);
+    const vocabRatio = wordCount > 0 ? uniqueWords.size / wordCount : 0;
+    if (vocabRatio > 0.6) {
+        vocabScore = 75;
+        feedback.vocabulary = '词汇使用多样，表达丰富';
+    } else if (vocabRatio > 0.4) {
+        vocabScore = 62;
+        feedback.vocabulary = '词汇基本适当，可尝试使用更多高级词汇';
+    } else {
+        vocabScore = 50;
+        feedback.vocabulary = '词汇重复较多，建议丰富词汇量';
+    }
+
+    pronScore = Math.round((fluencyScore + vocabScore) / 2);
+
+    const overall = Math.round((fluencyScore + grammarScore + contentScore + vocabScore + pronScore) / 5);
+
+    return {
+        scores: {
+            fluency: fluencyScore,
+            grammar: grammarScore,
+            content: contentScore,
+            vocabulary: vocabScore,
+            pronunciation: pronScore
+        },
+        overall,
+        feedback,
+        errors,
+        suggestions: [
+            '多进行口语练习，尝试录音后回放检查',
+            '注意使用连接词（however, therefore, in addition等）提升连贯性',
+            '积累话题相关的高级词汇和表达方式'
+        ],
+        referenceAnswer: '建议围绕话题展开2-3个主要观点，每个观点用具体例子支撑，注意使用过渡词连接各部分。',
+        wordStats: { wordCount, durationSec: durationSec || 120, wordsPerMin }
+    };
+}
+
 // 本地翻译评判引擎（降级方案）
 function evaluateTranslationLocal(source, userTrans, refTrans) {
     let score = 60; // 基础分

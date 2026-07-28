@@ -231,6 +231,229 @@ class ApiClient {
         return this.post('/ai/ocr-analyze', { image });
     }
 
+    // AI口语练习 - 生成话题
+    async generateSpeakingTopic(category) {
+        return this.post('/ai/speaking/generate', { category });
+    }
+
+    // AI口语练习 - 评判回答
+    async evaluateSpeaking(topic, transcription, duration) {
+        return this.post('/ai/speaking/evaluate', { topic, transcription, duration });
+    }
+
+    // ========== 真题练习接口 ==========
+
+    // 生成真题练习题目
+    async generateExamPractice(section, difficulty, topic) {
+        return this.post('/exam-practice/generate', { section, difficulty, topic });
+    }
+
+    // 评估真题答案
+    async evaluateExamPractice(section, questions, userAnswers) {
+        return this.post('/exam-practice/evaluate', { section, questions, userAnswers });
+    }
+
+    // 获取真题练习历史
+    async getExamPracticeHistory() {
+        return this.get('/exam-practice/history');
+    }
+
+    // 获取可用题型列表
+    async getExamSections() {
+        return this.get('/exam-practice/sections');
+    }
+
+    // ========== 错题库对话Agent接口 ==========
+
+    // 错题库Agent对话
+    async errorAgentChat(message, sessionId) {
+        return this.post('/error-agent/chat', { message, sessionId });
+    }
+
+    // 清除错题Agent会话
+    async clearErrorAgentSession(sessionId) {
+        return this.post('/error-agent/clear', { sessionId });
+    }
+
+    // 获取错题统计摘要
+    async getErrorSummary() {
+        return this.get('/error-agent/summary');
+    }
+
+    // ========== AI学习导师接口 ==========
+
+    // 导师对话
+    async tutorChat(message, sessionId) {
+        return this.post('/agent/chat', { message, sessionId });
+    }
+
+    // 清除导师会话
+    async clearTutorSession(sessionId) {
+        return this.post('/agent/clear', { sessionId });
+    }
+
+    // 流式导师对话（SSE）
+    async streamTutorChat(message, sessionId, onToken, onDone, onError) {
+        return this.streamChat('/stream/tutor', { message, sessionId }, onToken, onDone, onError);
+    }
+
+    // 流式错题Agent对话（SSE）
+    async streamErrorAgentChat(message, sessionId, onToken, onDone, onError) {
+        return this.streamChat('/stream/error-agent', { message, sessionId }, onToken, onDone, onError);
+    }
+
+    // 通用 SSE 流式请求
+    async streamChat(path, body, onToken, onDone, onError) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+        try {
+            const response = await fetch(`${this.baseUrl}${path}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.type === 'token' && onToken) {
+                                onToken(data.content);
+                            } else if (data.type === 'session') {
+                                // 会话ID，可通过回调处理
+                                if (onToken) onToken('', data);
+                            } else if (data.type === 'done' && onDone) {
+                                onDone(data.content);
+                            } else if (data.type === 'error' && onError) {
+                                onError(data.message);
+                            }
+                        } catch (e) { /* 忽略解析错误 */ }
+                    }
+                }
+            }
+        } catch (err) {
+            if (onError) onError(err.message);
+            throw err;
+        }
+    }
+
+    // 获取AI可观测性数据
+    async getAIMetrics() {
+        return this.get('/stream/metrics');
+    }
+
+    // ========== RAG 知识检索接口 ==========
+
+    // 索引单词
+    async indexWord(wordId) {
+        return this.post('/rag/index', { wordId });
+    }
+
+    // 搜索知识
+    async searchKnowledge(query, limit) {
+        return this.post('/rag/search', { query, limit: limit || 5 });
+    }
+
+    // 获取RAG统计
+    async getRAGStats() {
+        return this.get('/rag/stats');
+    }
+
+    // 构建RAG上下文
+    async buildRAGContext(query, limit) {
+        return this.post('/rag/build-context', { query, limit: limit || 5 });
+    }
+
+    // ========== ReAct 智能体接口 ==========
+
+    // 同步执行智能体
+    async runStudyAgent(message) {
+        return this.post('/study-agent/run', { message });
+    }
+
+    // 流式执行智能体（SSE，逐步推送 think/act 过程）
+    async runStudyAgentStream(message, onStepStart, onToolResult, onAnswer, onDone, onError) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+        try {
+            const response = await fetch(`${this.baseUrl}/study-agent/run-stream`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ message })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            switch (data.type) {
+                                case 'step_start':
+                                    if (onStepStart) onStepStart(data.step);
+                                    break;
+                                case 'tool_result':
+                                    if (onToolResult) onToolResult(data.step, data.tool, data.result);
+                                    break;
+                                case 'answer':
+                                    if (onAnswer) onAnswer(data.content);
+                                    break;
+                                case 'done':
+                                    if (onDone) onDone(data.totalSteps, data.reply);
+                                    break;
+                                case 'error':
+                                    if (onError) onError(data.message);
+                                    break;
+                            }
+                        } catch (e) { /* 忽略解析错误 */ }
+                    }
+                }
+            }
+        } catch (err) {
+            if (onError) onError(err.message);
+            throw err;
+        }
+    }
+
+    // 获取智能体可用工具列表
+    async getAgentTools() {
+        return this.get('/study-agent/tools');
+    }
+
     async generateExample(word, meaning) {
         return this.post('/ai/generate-example', { word, meaning });
     }
@@ -325,6 +548,18 @@ class ApiClient {
     // 删除复习项目
     async deleteReview(id) {
         return this.delete(`/review/${id}`);
+    }
+
+    // ========== AI学情预测 + 学习计划接口 ==========
+
+    // 获取学情预测数据
+    async predictForecast() {
+        return this.get('/predict/forecast');
+    }
+
+    // 生成AI学习计划
+    async generateStudyPlan(examDate, dailyHours, targetScore) {
+        return this.post('/predict/plan', { examDate, dailyHours, targetScore });
     }
 }
 

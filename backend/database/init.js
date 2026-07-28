@@ -269,4 +269,8 @@ async function initDatabase() {
     console.log('请运行 npm run import-words 导入单词数据');
 }
 
-initDatabase().catch(console.error);
+if (require.main === module) {
+    initDatabase().catch(console.error);
+}
+
+module.exports = { initDatabase };

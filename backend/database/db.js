@@ -1,7 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'word_collection.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'word_collection.db');
 
 // 创建数据库连接
 const db = new sqlite3.Database(DB_PATH, (err) => {
