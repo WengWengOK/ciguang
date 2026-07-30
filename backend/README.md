@@ -165,12 +165,15 @@ backend/
 │   ├── review.js             # 艾宾浩斯复习路由
 │   └── sync.js               # 数据同步路由
 ├── agent/                   # ReAct 智能体框架 ⭐
-│   ├── BaseAgent.js          # 状态机 + 步数循环（IDLE→RUNNING→FINISHED）
+│   ├── BaseAgent.js          # 状态机 + 步数循环 + 超时控制 + O层轨迹集成
 │   ├── ReActAgent.js         # think/act 模板方法
-│   ├── ToolCallAgent.js      # 手动工具调用（禁用自动执行）
-│   └── StudyAgent.js         # 具体智能体（提示词+工具集配置）
+│   ├── ToolCallAgent.js      # 手动工具调用 + C层上下文压缩 + O层轨迹记录
+│   ├── StudyAgent.js         # 具体智能体（提示词+工具集配置）
+│   ├── PlanExecuteAgent.js   # L层：Plan-and-Execute 任务分解 ⭐
+│   └── MultiAgentOrchestrator.js # L层：多 Agent 编排与路由 ⭐
 ├── tools/                   # 工具注册系统 ⭐
 │   ├── ToolRegistry.js      # 工具注册中心（集中注册+按需注入）
+│   ├── EnhancedToolRegistry.js # T层：Schema校验+熔断+并行执行 ⭐
 │   ├── WordTool.js           # 单词查询工具
 │   ├── ProfileTool.js        # 学情画像工具
 │   ├── ReviewTool.js         # 复习队列工具
@@ -182,14 +185,17 @@ backend/
 │   ├── AIService.js          # 统一 AI 服务（DashScope/DeepSeek 自动切换+可观测性）
 │   ├── QueryRewriter.js      # RAG 查询重写器
 │   ├── SessionStore.js       # 会话并发安全存储（SQLite+内存锁，替代 FileBasedChatMemory）
-│   └── EvaluationService.js  # AI 评测框架（质量评分+工具准确率+回归测试）
+│   ├── EvaluationService.js  # V层：AI 评测框架（质量评分+工具准确率+回归测试）
+│   ├── ContextManager.js     # C层：Token 预算管理 + 40% 阈值上下文压缩 ⭐
+│   └── ExecutionTracer.js    # O层：Agent 执行轨迹完整记录 + SQLite 持久化 ⭐
 ├── rag/                      # RAG 检索增强生成模块
 │   ├── embedding.js          # Embedding 生成（DashScope + 本地降级）
 │   ├── vectorStore.js        # 向量存储（SQLite + 余弦相似度检索）
 │   └── retriever.js          # 知识检索器
 ├── middleware/               # 中间件
 │   ├── auth.js               # JWT 认证中间件
-│   └── ai-observability.js   # AI 可观测性中间件
+│   ├── ai-observability.js   # AI 可观测性中间件
+│   └── guardrails.js         # G层：输入防护+输出过滤+审计日志 ⭐
 ├── utils/                    # 工具层
 │   ├── sse-stream.js         # SSE 流式输出（DeepSeek + DashScope）
 │   └── sse-parser.js         # SSE 协议解析器
@@ -311,6 +317,50 @@ backend/
 - **评分维度**：相关性 / 完整性 / 准确性 / 格式规范性（0-10 分）
 - **工具选择准确率**：Precision / Recall / F1（对比实际调用 vs 应调用工具集）
 - **回归测试**：预定义测试用例，自动执行并对比基线，检测质量退化
+
+### 8. ETCLOVG 七层 Harness 架构增强
+
+基于 AI Agent Harness 框架最佳实践，项目完成了 ETCLOVG 七层架构的全面增强，使 Agent 系统具备生产级的安全、可控、可观测能力。
+
+| 层级 | 名称 | 模块 | 核心能力 |
+|------|------|------|---------|
+| E | Execution Environment | BaseAgent | 状态机 + 超时控制 + SessionStore 持久化 |
+| T | Tool Interface Protocol | EnhancedToolRegistry | JSON Schema 校验 + 并行执行 + 熔断器 |
+| C | Context Memory | ContextManager | Token 预算管理 + 40% 阈值自动压缩 |
+| L | Lifecycle Orchestration | PlanExecuteAgent + MultiAgentOrchestrator | 任务分解 + 多 Agent 编排 |
+| O | Observability | ExecutionTracer | 执行轨迹完整记录 + SQLite 持久化 |
+| V | Validation & Evaluation | EvaluationService | LLM-as-Judge + 回归测试 |
+| G | Governance & Security | Guardrails | 输入防护 + 输出过滤 + 审计日志 |
+
+#### 8.1 T 层：增强工具协议（EnhancedToolRegistry）
+- **Schema 校验**：工具入参 JSON Schema 校验，支持 required/type/enum，自动类型转换
+- **熔断器**：CLOSED → OPEN → HALF_OPEN 状态机，连续失败 3 次自动熔断，60 秒后探测恢复
+- **超时控制**：工具级可配置超时，默认 10 秒，Promise.race 实现
+- **并行执行**：独立工具并行调用，错误隔离，互不影响
+
+#### 8.2 C 层：上下文压缩与 Token 预算（ContextManager）
+- **Token 预算**：按模型上下文窗口（qwen-turbo: 8192, deepseek-chat: 32768）管理预算
+- **40% 阈值压缩**：当 messageList 估算 Token 达到上下文窗口 40% 时自动触发压缩
+- **LLM 摘要**：保留最近 4 条消息，更早的历史用 LLM 压缩为摘要 system 消息
+- **降级策略**：无 API Key 时自动降级为截断策略（保留首尾，删除中间）
+- **tool_calls 关联保护**：压缩时保证 assistant(tool_calls) → tool(结果) 不被拆散
+
+#### 8.3 L 层：生命周期编排（PlanExecuteAgent + MultiAgentOrchestrator）
+- **Plan-and-Execute**：复杂任务自动分解为结构化子任务，支持依赖排序和动态修订（最多 3 次修订）
+- **Multi-Agent 编排**：Agent 注册/路由/委派/并行执行，LLM 意图分类自动选择最合适的 Agent
+- **状态机**：PLANNING → EXECUTING → DONE 三阶段流转，支持 plan revision 回退
+
+#### 8.4 O 层：执行轨迹完整记录（ExecutionTracer）
+- **全链路记录**：think/act/tool_call/state_change/error/plan 全阶段轨迹
+- **数据脱敏**：password/token/apiKey 等敏感字段自动脱敏为 `***`
+- **结果截断**：工具结果截断到 2000 字符，LLM 输入只存 role + content 前 200 字符
+- **SQLite 持久化**：fire-and-forget 异步写入，不阻塞 Agent 主流程
+- **可回放**：支持按 traceId 和 userId 查询历史轨迹
+
+#### 8.5 G 层：安全防护（Guardrails）
+- **输入防护**：Prompt Injection 检测（阻断级 + 告警级）、PII 脱敏、输入长度限制
+- **输出过滤**：毒性检测与过滤、幻觉表达检测、重复内容检测
+- **审计日志**：所有 AI 交互自动记录到 SQLite audit_logs 表，支持按 traceId/userId/时间查询
 
 ## 部署
 

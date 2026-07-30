@@ -13,7 +13,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { authMiddleware } = require('../middleware/auth');
 const { StudyAgent } = require('../agent/StudyAgent');
-const { getAllTools, getToolDefinitions } = require('../tools/ToolRegistry');
+const { getAllTools, getToolDefinitions } = require('../tools/EnhancedToolRegistry');
 const { setupSSEResponse } = require('../utils/sse-stream');
 
 const router = express.Router();
@@ -93,6 +93,12 @@ router.post('/run', authMiddleware, agentRateLimit, async (req, res) => {
         // 获取最终回复
         const finalReply = agent.getFinalResponse();
 
+        // O 层：获取执行轨迹摘要
+        let traceSummary = null;
+        if (agent.tracer) {
+            traceSummary = agent.tracer.getTraceSummary();
+        }
+
         res.json({
             success: true,
             data: {
@@ -102,7 +108,8 @@ router.post('/run', authMiddleware, agentRateLimit, async (req, res) => {
                 totalSteps: agent.currentStep,
                 sessionId,
                 traceId: agent.traceId,
-                state: agent.state
+                state: agent.state,
+                traceSummary
             }
         });
 
@@ -209,6 +216,12 @@ router.post('/run-stream', authMiddleware, agentRateLimit, async (req, res) => {
             traceId: agent.traceId
         })}\n\n`);
 
+        // O 层：获取执行轨迹摘要
+        let traceSummary = null;
+        if (agent.tracer) {
+            traceSummary = agent.tracer.getTraceSummary();
+        }
+
         // 推送完成事件
         res.write(`data: ${JSON.stringify({
             type: 'done',
@@ -216,7 +229,8 @@ router.post('/run-stream', authMiddleware, agentRateLimit, async (req, res) => {
             reply: finalReply,
             sessionId,
             traceId: agent.traceId,
-            state: agent.state
+            state: agent.state,
+            traceSummary
         })}\n\n`);
 
         res.end();

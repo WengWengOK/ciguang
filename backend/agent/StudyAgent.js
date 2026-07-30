@@ -11,7 +11,7 @@
  */
 
 const { ToolCallAgent } = require('./ToolCallAgent');
-const { getAllTools } = require('../tools/ToolRegistry');
+const { getAllTools } = require('../tools/EnhancedToolRegistry');
 
 const SYSTEM_PROMPT = `你是"词光"考研英语学习智能体，一个能够自主规划和执行任务的 AI 学习助手。
 

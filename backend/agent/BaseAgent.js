@@ -95,6 +95,25 @@ class BaseAgent {
         this.traceId = crypto.randomUUID();
         this.sessionId = sessionId;
 
+        // O 层：初始化执行轨迹记录器
+        // 如果子类（ToolCallAgent 等）已有 tracer 则跳过
+        if (!this.tracer) {
+            try {
+                const { ExecutionTracer } = require('../services/ExecutionTracer');
+                this.tracer = new ExecutionTracer({
+                    traceId: this.traceId,
+                    agentName: this.name,
+                    sessionId: this.sessionId,
+                    userId: this.userId
+                });
+            } catch (e) {
+                console.warn(`[${this.name}] 执行轨迹记录器初始化失败:`, e.message);
+            }
+        } else {
+            // 子类已初始化 tracer，更新 traceId
+            this.tracer.traceId = this.traceId;
+        }
+
         // 如果提供了 sessionId，从 SessionStore 加载历史消息
         // 解决 yu-ai-agent 的 messageList 串话问题：
         // 每次请求创建新 Agent 实例（避免实例变量共享），
@@ -115,6 +134,15 @@ class BaseAgent {
         // 启动
         this.state = AgentState.RUNNING;
         this.messageList.push({ role: 'user', content: userPrompt });
+
+        // O 层：记录状态变化 IDLE → RUNNING
+        if (this.tracer) {
+            this.tracer.recordStateChange(0, {
+                from: 'idle',
+                to: 'running',
+                reason: 'Agent 启动'
+            });
+        }
 
         console.log(`[${this.name}] Agent 启动，最大步数: ${this.maxSteps}，超时: ${timeoutMs / 1000}s，traceId: ${this.traceId}`);
 
@@ -168,17 +196,53 @@ class BaseAgent {
                 this.state = AgentState.FINISHED;
                 this.results.push(`Terminated: Reached max steps (${this.maxSteps})`);
                 console.log(`[${this.name}] 达到最大步数上限，强制终止`);
+
+                // O 层：记录状态变化 → FINISHED
+                if (this.tracer) {
+                    this.tracer.recordStateChange(this.currentStep, {
+                        from: 'running',
+                        to: 'finished',
+                        reason: `达到最大步数上限 (${this.maxSteps})`
+                    });
+                }
             }
 
             // 整体超时后标记 ERROR
             if (signal.aborted && this.state !== AgentState.FINISHED) {
                 this.state = AgentState.ERROR;
                 this.results.push(`Terminated: Overall timeout (${timeoutMs / 1000}s)`);
+
+                // O 层：记录状态变化 → ERROR + 错误详情
+                if (this.tracer) {
+                    this.tracer.recordStateChange(this.currentStep, {
+                        from: 'running',
+                        to: 'error',
+                        reason: `整体超时 (${timeoutMs / 1000}s)`
+                    });
+                    this.tracer.recordError(this.currentStep, {
+                        phase: 'run',
+                        error: `Agent 整体超时 (${timeoutMs / 1000}s)`
+                    });
+                }
             }
 
         } catch (err) {
             this.state = AgentState.ERROR;
             console.error(`[${this.name}] Agent 执行出错:`, err.message);
+
+            // O 层：记录错误
+            if (this.tracer) {
+                this.tracer.recordError(this.currentStep, {
+                    phase: 'run',
+                    error: err,
+                    stack: err.stack
+                });
+                this.tracer.recordStateChange(this.currentStep, {
+                    from: 'running',
+                    to: 'error',
+                    reason: err.message
+                });
+            }
             throw err;
         } finally {
             clearTimeout(overallTimeoutId);
@@ -192,6 +256,15 @@ class BaseAgent {
                 } catch (e) {
                     console.warn(`[${this.name}] SessionStore 持久化失败:`, e.message);
                 }
+            }
+
+            // O 层：记录最终状态
+            if (this.tracer && this.state === AgentState.FINISHED) {
+                this.tracer.recordStateChange(this.currentStep, {
+                    from: 'running',
+                    to: 'finished',
+                    reason: 'Agent 正常完成'
+                });
             }
 
             await this.cleanup();
@@ -227,6 +300,23 @@ class BaseAgent {
         this.traceId = crypto.randomUUID();
         this.sessionId = sessionId;
 
+        // O 层：初始化执行轨迹记录器
+        if (!this.tracer) {
+            try {
+                const { ExecutionTracer } = require('../services/ExecutionTracer');
+                this.tracer = new ExecutionTracer({
+                    traceId: this.traceId,
+                    agentName: this.name,
+                    sessionId: this.sessionId,
+                    userId: this.userId
+                });
+            } catch (e) {
+                console.warn(`[${this.name}] 执行轨迹记录器初始化失败:`, e.message);
+            }
+        } else {
+            this.tracer.traceId = this.traceId;
+        }
+
         // 从 SessionStore 加载历史消息
         if (sessionId) {
             try {
@@ -243,6 +333,15 @@ class BaseAgent {
 
         this.state = AgentState.RUNNING;
         this.messageList.push({ role: 'user', content: userPrompt });
+
+        // O 层：记录状态变化 IDLE → RUNNING
+        if (this.tracer) {
+            this.tracer.recordStateChange(0, {
+                from: 'idle',
+                to: 'running',
+                reason: '流式 Agent 启动'
+            });
+        }
 
         console.log(`[${this.name}] 流式 Agent 启动，最大步数: ${this.maxSteps}，超时: ${timeoutMs / 1000}s，traceId: ${this.traceId}`);
 
@@ -307,6 +406,16 @@ class BaseAgent {
                 this.state = AgentState.FINISHED;
                 const terminateMsg = `Terminated: Reached max steps (${this.maxSteps})`;
                 this.results.push(terminateMsg);
+
+                // O 层：记录状态变化 → FINISHED
+                if (this.tracer) {
+                    this.tracer.recordStateChange(this.currentStep, {
+                        from: 'running',
+                        to: 'finished',
+                        reason: `达到最大步数上限 (${this.maxSteps})`
+                    });
+                }
+
                 if (onStep) {
                     onStep({
                         step: this.currentStep,
@@ -319,6 +428,20 @@ class BaseAgent {
 
             if (signal.aborted && this.state !== AgentState.FINISHED) {
                 this.state = AgentState.ERROR;
+
+                // O 层：记录状态变化 → ERROR
+                if (this.tracer) {
+                    this.tracer.recordStateChange(this.currentStep, {
+                        from: 'running',
+                        to: 'error',
+                        reason: `流式整体超时 (${timeoutMs / 1000}s)`
+                    });
+                    this.tracer.recordError(this.currentStep, {
+                        phase: 'runStream',
+                        error: `流式 Agent 整体超时 (${timeoutMs / 1000}s)`
+                    });
+                }
+
                 if (onStep) {
                     onStep({
                         step: this.currentStep,
@@ -333,6 +456,21 @@ class BaseAgent {
         } catch (err) {
             this.state = AgentState.ERROR;
             console.error(`[${this.name}] 流式 Agent 执行出错:`, err.message);
+
+            // O 层：记录错误
+            if (this.tracer) {
+                this.tracer.recordError(this.currentStep, {
+                    phase: 'runStream',
+                    error: err,
+                    stack: err.stack
+                });
+                this.tracer.recordStateChange(this.currentStep, {
+                    from: 'running',
+                    to: 'error',
+                    reason: err.message
+                });
+            }
+
             if (onStep) {
                 onStep({
                     step: this.currentStep,
@@ -353,6 +491,15 @@ class BaseAgent {
                 } catch (e) {
                     console.warn(`[${this.name}] SessionStore 持久化失败:`, e.message);
                 }
+            }
+
+            // O 层：记录最终状态
+            if (this.tracer && this.state === AgentState.FINISHED) {
+                this.tracer.recordStateChange(this.currentStep, {
+                    from: 'running',
+                    to: 'finished',
+                    reason: '流式 Agent 正常完成'
+                });
             }
 
             await this.cleanup();
@@ -386,6 +533,7 @@ class BaseAgent {
         this.results = [];
         this.traceId = null;
         this.sessionId = null;
+        this.tracer = null;
     }
 
     /**

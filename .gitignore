@@ -12,3 +12,27 @@ backend/database/*.db-journal
 backend/.env
 backend/coverage/
 backend/test_*.db
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# TRAE generated packages & temp files
+.trae-html-share-packages/
+.uploads/
+.screenshots/
+ai-engineer-skill-assessment/
+*.html.zip
+词光-*.html
+词光项目.zip
+
+# Report generated assets (third-party JS libs)
+product-*/_shared/js/
+ciguang-competition-entry/_shared/js/
+
+# Node
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

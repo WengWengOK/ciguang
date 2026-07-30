@@ -15,6 +15,8 @@
 const { ReActAgent } = require('./ReActAgent');
 const { AgentState } = require('./BaseAgent');
 const { chatWithTools, getActiveProvider, AIProvider } = require('../services/AIService');
+const { ContextManager } = require('../services/ContextManager');
+const { ExecutionTracer } = require('../services/ExecutionTracer');
 
 // 终止工具名称（Agent 调用此工具表示任务完成）
 const TERMINATE_TOOL_NAME = 'terminate';
@@ -37,15 +39,61 @@ class ToolCallAgent extends ReActAgent {
         if (options.nextStepPrompt) {
             this.nextStepPrompt = options.nextStepPrompt;
         }
+
+        // C 层：上下文管理器（Token 预算 + 自动压缩）
+        // 40% 阈值触发压缩，保留最近 4 条消息，为输出预留 1000 token
+        this.contextManager = new ContextManager({
+            model: options.model || 'qwen-turbo',
+            compressionThreshold: 0.4,
+            keepRecent: 4,
+            reservedTokens: 1000,
+            userId: options.userId
+        });
+
+        // O 层：执行轨迹记录器（延迟初始化，traceId 在 run() 中生成）
+        this.tracer = null;
+    }
+
+    /**
+     * 初始化执行轨迹记录器（在 BaseAgent.run() 生成 traceId 后调用）
+     * @param {string} traceId - 来自 BaseAgent 的 traceId
+     */
+    initTracer(traceId) {
+        this.tracer = new ExecutionTracer({
+            traceId: traceId,
+            agentName: this.name,
+            sessionId: this.sessionId,
+            userId: this.userId
+        });
     }
 
     /**
      * think: 让 AI 决策下一步要调用哪些工具
      * 将工具定义传给 AI，但不自动执行，只获取决策
      *
+     * C 层增强：在调用 LLM 前检查 Token 预算，达到 40% 阈值时自动压缩上下文
+     * O 层增强：记录 think 阶段的完整输入、决策和耗时到执行轨迹
+     *
      * @returns {boolean} true=需要执行工具, false=无需执行（已有答案）
      */
     async think() {
+        const thinkStartTime = Date.now();
+
+        // ===== C 层：上下文压缩 =====
+        // 在构建 messages 前检查 Token 预算，达到阈值时自动压缩 messageList
+        try {
+            const compressResult = await this.contextManager.checkAndCompress(this.messageList, {
+                model: this.model
+            });
+            if (compressResult.compressed) {
+                this.messageList = compressResult.messages;
+                console.log(`[${this.name}] C层: 上下文已压缩 ${compressResult.tokensBefore}→${compressResult.tokensAfter} tokens (${compressResult.method})`);
+            }
+        } catch (err) {
+            // 压缩失败不阻断主流程
+            console.warn(`[${this.name}] C层: 上下文压缩失败，使用原始上下文:`, err.message);
+        }
+
         // 构建 messages（system prompt + 历史消息 + nextStepPrompt）
         const messages = [];
 
@@ -75,6 +123,15 @@ class ToolCallAgent extends ReActAgent {
 
         // 无 AI API Key 时的降级处理
         if (getActiveProvider() === AIProvider.LOCAL) {
+            // O 层：记录降级 think
+            if (this.tracer) {
+                this.tracer.recordThink(this.currentStep, {
+                    input: messages,
+                    toolCalls: [],
+                    decision: false,
+                    durationMs: Date.now() - thinkStartTime
+                });
+            }
             return this.thinkLocal(messages);
         }
 
@@ -96,12 +153,35 @@ class ToolCallAgent extends ReActAgent {
             this.pendingToolCalls = result.toolCalls;
             // 不将 assistant 消息加入 messageList（因为执行工具后会统一处理）
             console.log(`[${this.name}] think: 决定调用 ${result.toolCalls.length} 个工具: ${result.toolCalls.map(tc => tc.function.name).join(', ')}`);
+
+            // O 层：记录 think 阶段（有工具调用）
+            if (this.tracer) {
+                this.tracer.recordThink(this.currentStep, {
+                    input: messages,
+                    toolCalls: result.toolCalls.map(tc => ({
+                        name: tc.function.name,
+                        arguments: tc.function.arguments
+                    })),
+                    decision: true,
+                    durationMs: Date.now() - thinkStartTime
+                });
+            }
             return true;
         } else {
             // 无需调用工具，AI 已有最终答案
             // 将 assistant 消息加入上下文
             this.messageList.push({ role: 'assistant', content: result.content });
             console.log(`[${this.name}] think: 无需调用工具，已有最终答案`);
+
+            // O 层：记录 think 阶段（无工具调用）
+            if (this.tracer) {
+                this.tracer.recordThink(this.currentStep, {
+                    input: messages,
+                    toolCalls: [],
+                    decision: false,
+                    durationMs: Date.now() - thinkStartTime
+                });
+            }
             return false;
         }
     }
@@ -109,6 +189,8 @@ class ToolCallAgent extends ReActAgent {
     /**
      * act: 手动执行 think 阶段决策的工具调用
      * 逐个执行工具，收集结果，将结果反馈到消息上下文
+     *
+     * O 层增强：记录每个工具调用的入参、结果、成功/失败和耗时
      *
      * @returns {string} 工具执行结果汇总
      */
@@ -135,6 +217,17 @@ class ToolCallAgent extends ReActAgent {
                 shouldTerminate = true;
                 toolResults.push(`工具 ${toolName}: 任务结束`);
                 console.log(`[${this.name}] act: 检测到终止工具，任务完成`);
+
+                // O 层：记录终止工具调用
+                if (this.tracer) {
+                    this.tracer.recordAct(this.currentStep, {
+                        toolName,
+                        args,
+                        result: '任务结束',
+                        success: true,
+                        durationMs: 0
+                    });
+                }
                 continue;
             }
 
@@ -142,17 +235,52 @@ class ToolCallAgent extends ReActAgent {
             const tool = this.tools.find(t => t.name === toolName);
             if (!tool) {
                 toolResults.push(`工具 ${toolName}: 工具不存在`);
+
+                // O 层：记录工具不存在
+                if (this.tracer) {
+                    this.tracer.recordAct(this.currentStep, {
+                        toolName,
+                        args,
+                        result: '工具不存在',
+                        success: false,
+                        error: `工具 ${toolName} 未注册`
+                    });
+                }
                 continue;
             }
 
+            const toolStartTime = Date.now();
             try {
                 console.log(`[${this.name}] act: 执行工具 ${toolName}，参数:`, JSON.stringify(args));
                 const result = await tool.execute(args, { userId: this.userId });
                 toolResults.push(`工具 ${toolName} 返回的结果：${typeof result === 'string' ? result : JSON.stringify(result)}`);
                 console.log(`[${this.name}] act: 工具 ${toolName} 执行完成`);
+
+                // O 层：记录工具执行成功
+                if (this.tracer) {
+                    this.tracer.recordAct(this.currentStep, {
+                        toolName,
+                        args,
+                        result,
+                        success: true,
+                        durationMs: Date.now() - toolStartTime
+                    });
+                }
             } catch (err) {
                 toolResults.push(`工具 ${toolName} 执行失败：${err.message}`);
                 console.error(`[${this.name}] act: 工具 ${toolName} 执行失败:`, err.message);
+
+                // O 层：记录工具执行失败
+                if (this.tracer) {
+                    this.tracer.recordAct(this.currentStep, {
+                        toolName,
+                        args,
+                        result: null,
+                        success: false,
+                        error: err,
+                        durationMs: Date.now() - toolStartTime
+                    });
+                }
             }
         }
 

@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const path = require('path');
 require('dotenv').config();
 
+const { guardMiddleware } = require('./middleware/guardrails');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -23,6 +25,14 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// G 层：Guardrails 安全防护中间件（输入防护 + 输出过滤 + 审计日志）
+// 挂载在 AI 相关路由上，fail-open 保证向后兼容
+app.use('/api/ai', guardMiddleware());
+app.use('/api/stream', guardMiddleware());
+app.use('/api/study-agent', guardMiddleware());
+app.use('/api/plan-execute', guardMiddleware());
+app.use('/api/orchestrator', guardMiddleware());
+
 // 静态文件服务（前端文件）
 app.use(express.static(path.join(__dirname, '..')));
 
@@ -41,6 +51,8 @@ app.use('/api/error-agent', require('./routes/error-agent'));
 app.use('/api/rag', require('./routes/rag'));
 app.use('/api/stream', require('./routes/stream'));
 app.use('/api/study-agent', require('./routes/study-agent'));
+app.use('/api/plan-execute', require('./routes/plan-execute'));
+app.use('/api/orchestrator', require('./routes/orchestrator'));
 
 // 健康检查
 app.get('/api/health', (req, res) => {
@@ -135,6 +147,15 @@ app.get('/api', (req, res) => {
                 'POST /api/study-agent/run': 'ReAct智能体同步执行（think+act多步推理+工具调用）',
                 'POST /api/study-agent/run-stream': 'ReAct智能体SSE流式执行（逐步推送推理过程）',
                 'GET /api/study-agent/tools': '获取智能体可用工具列表'
+            },
+            'plan-execute': {
+                'POST /api/plan-execute/run': 'Plan-Execute智能体同步执行（复杂任务自动分解为子任务）',
+                'POST /api/plan-execute/run-stream': 'Plan-Execute智能体SSE流式执行（逐步推送plan/execute过程）'
+            },
+            'orchestrator': {
+                'POST /api/orchestrator/run': '多Agent编排执行（自动路由到最合适的Agent）',
+                'GET /api/orchestrator/agents': '获取已注册的Agent列表',
+                'POST /api/orchestrator/delegate': '手动委派任务给指定Agent'
             }
         }
     });
