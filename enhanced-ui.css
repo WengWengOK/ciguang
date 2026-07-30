@@ -1,0 +1,1420 @@
+/* ============================================================
+ * 词光 (CiGuang) - 考研英语学习平台
+ * Enhanced UI Layer - 视觉增强层 v2 (Advanced Glassmorphism)
+ * ------------------------------------------------------------
+ * 本文件为叠加在 styles.css 之上的高级化视觉增强层
+ * 提供玻璃拟态 (Glassmorphism)、环境光晕、AI Agent 面板、
+ * 微交互动画等现代化 UI 特效
+ *
+ * 设计理念：
+ *   - 深空暗色基底 + 多层环境光晕营造空间纵深感
+ *   - 玻璃拟态卡片半透明叠加，backdrop-filter 模糊
+ *   - 渐变色系统：蓝(主) → 紫(辅) → 绿(成功) → 金(高亮)
+ *   - 微交互：hover 提升、扫光效果、脉冲动画
+ *
+ * 依赖：styles.css 中的 :root CSS 变量
+ *   --accent: #4a9eff, --level-2: #9f7aea, --bg-primary: #0f0f1a
+ *
+ * 主题支持：暗色 (默认) / 浅色 (body.light-theme)
+ * 缓动函数：cubic-bezier(0.4, 0, 0.2, 1)
+ * ============================================================ */
+
+/* ============================================================
+ * 1. 深空背景系统 (Deep Space Background)
+ * ============================================================ */
+
+/* 覆盖 body 的实体背景，改为深空渐变 */
+html {
+  background: #0a0a14 !important;
+}
+
+body {
+  background: transparent !important;
+  position: relative;
+}
+
+/* 深空渐变层 */
+body::before {
+  content: '' !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: -2 !important;
+  pointer-events: none !important;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(74, 158, 255, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(159, 122, 234, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(72, 187, 120, 0.06) 0%, transparent 60%),
+    linear-gradient(180deg, #08080f 0%, #0a0a16 50%, #08080f 100%) !important;
+}
+
+/* ============================================================
+ * 2. 环境光晕 (Ambient Gradient Orbs)
+ * ============================================================ */
+
+/* 蓝色光球 - 左上角 */
+.cg-orb-blue {
+  position: fixed;
+  top: -150px;
+  left: -100px;
+  width: 550px;
+  height: 550px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(74, 158, 255, 0.35) 0%, transparent 65%);
+  filter: blur(50px);
+  z-index: -1;
+  pointer-events: none;
+  animation: orb-drift-1 25s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* 紫色光球 - 右下角 */
+.cg-orb-purple {
+  position: fixed;
+  bottom: -120px;
+  right: -80px;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(159, 122, 234, 0.3) 0%, transparent 65%);
+  filter: blur(50px);
+  z-index: -1;
+  pointer-events: none;
+  animation: orb-drift-2 30s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* 青色光球 - 中间偏右 */
+.cg-orb-cyan {
+  position: fixed;
+  top: 40%;
+  left: 55%;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.18) 0%, transparent 65%);
+  filter: blur(45px);
+  z-index: -1;
+  pointer-events: none;
+  animation: orb-drift-3 35s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes orb-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(100px, 80px) scale(1.15); }
+  66% { transform: translate(-50px, 120px) scale(0.9); }
+}
+
+@keyframes orb-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-80px, -60px) scale(1.2); }
+  66% { transform: translate(60px, -100px) scale(0.85); }
+}
+
+@keyframes orb-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-120px, 60px) scale(1.1); }
+}
+
+/* ============================================================
+ * 3. 玻璃拟态卡片 (Glassmorphism Cards) - 核心增强
+ * ============================================================ */
+
+/* 覆盖 styles.css 的实体卡片背景，改为半透明玻璃 */
+.home-stat-card,
+.quick-action-card,
+.word-detail-card,
+.vocab-card,
+.review-card {
+  background: rgba(25, 25, 45, 0.4) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 噪点纹理叠加层 (Premium Noise Texture) */
+.home-stat-card::after,
+.quick-action-card::after,
+.home-welcome-banner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+  mix-blend-mode: overlay;
+}
+
+/* 卡片悬停扫光效果 */
+.home-stat-card::before,
+.quick-action-card::before,
+.word-detail-card::before,
+.vocab-card::before,
+.review-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.06),
+    transparent
+  );
+  transition: left 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.home-stat-card:hover,
+.quick-action-card:hover,
+.word-detail-card:hover,
+.vocab-card:hover,
+.review-card:hover {
+  transform: translateY(-6px) !important;
+  background: rgba(40, 40, 70, 0.65) !important;
+  border-color: rgba(74, 158, 255, 0.3) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 16px 48px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(74, 158, 255, 0.15),
+    0 0 30px rgba(74, 158, 255, 0.1) !important;
+}
+
+.home-stat-card:hover::before,
+.quick-action-card:hover::before,
+.word-detail-card:hover::before,
+.vocab-card:hover::before,
+.review-card:hover::before {
+  left: 100%;
+}
+
+/* 卡片内部内容层级 */
+.home-stat-card > *,
+.quick-action-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* ============================================================
+ * 4. 欢迎横幅增强 (Welcome Banner)
+ * ============================================================ */
+
+.home-welcome-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(74, 158, 255, 0.15),
+    rgba(159, 122, 234, 0.12)
+  ) !important;
+  backdrop-filter: blur(24px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 40px rgba(0, 0, 0, 0.3),
+    0 0 60px rgba(74, 158, 255, 0.08) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 横幅内的流动光效 */
+.home-welcome-banner::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(74, 158, 255, 0.08),
+    transparent,
+    rgba(159, 122, 234, 0.06),
+    transparent
+  );
+  animation: banner-rotate 20s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-welcome-banner > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes banner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+ * 5. 导航栏增强 (Navigation Bar)
+ * ============================================================ */
+
+.navbar,
+.nav-bar,
+.nav-container {
+  backdrop-filter: blur(30px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+  background: rgba(10, 10, 20, 0.75) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 4px 20px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* 导航 tab 激活态 */
+.nav-tab.active,
+.nav-item.active,
+.tab-item.active {
+  position: relative;
+  background: rgba(74, 158, 255, 0.12) !important;
+  border-radius: 10px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-tab.active::after,
+.nav-item.active::after,
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--level-2), transparent);
+  border-radius: 2px;
+  box-shadow: 0 0 16px rgba(74, 158, 255, 0.8);
+  animation: tab-indicator-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes tab-indicator-in {
+  from { left: 50%; right: 50%; opacity: 0; }
+  to { left: 25%; right: 25%; opacity: 1; }
+}
+
+/* tab hover */
+.nav-tab,
+.nav-item,
+.tab-item {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 10px;
+}
+
+.nav-tab:hover,
+.nav-item:hover,
+.tab-item:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ============================================================
+ * 6. 按钮系统增强 (Button System)
+ * ============================================================ */
+
+.btn-primary,
+.btn-accent {
+  background: linear-gradient(135deg, var(--accent), var(--level-2)) !important;
+  background-size: 200% 200% !important;
+  background-position: 0% 0% !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 4px 20px rgba(74, 158, 255, 0.3) !important;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover,
+.btn-accent:hover {
+  background-position: 100% 100% !important;
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 8px 32px rgba(74, 158, 255, 0.5),
+    0 0 0 1px rgba(74, 158, 255, 0.2) !important;
+}
+
+.btn-primary:active,
+.btn-accent:active {
+  transform: scale(0.97);
+}
+
+/* 次要按钮玻璃拟态 */
+.btn-secondary,
+.btn-ghost {
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.btn-secondary:hover,
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(74, 158, 255, 0.5) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(74, 158, 255, 0.15) !important;
+}
+
+/* ============================================================
+ * 7. 页面切换动画 (Page Transition)
+ * ============================================================ */
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page.active {
+  animation: page-enter 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+ * 8. AI Agent 面板 (Core Feature)
+ * ============================================================ */
+
+/* ---------- 8.1 面板容器 ---------- */
+
+.agent-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  height: 100vh;
+  backdrop-filter: blur(40px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  background: rgba(10, 10, 20, 0.88) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: -24px 0 80px rgba(0, 0, 0, 0.5) !important;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  animation: agent-panel-slide-in 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-panel.hidden,
+.agent-panel.closed {
+  animation: agent-panel-slide-out 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes agent-panel-slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes agent-panel-slide-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+/* ---------- 8.2 面板头部 ---------- */
+
+.agent-panel-header {
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* AI 头像 */
+.agent-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--level-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0 0 24px rgba(74, 158, 255, 0.5);
+}
+
+.agent-avatar::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: pulse-ring 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.agent-avatar svg,
+.agent-avatar .icon {
+  width: 22px;
+  height: 22px;
+  color: #fff;
+  z-index: 1;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.agent-panel-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-panel-title .title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.agent-panel-title .subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #48bb78;
+  box-shadow: 0 0 10px rgba(72, 187, 120, 0.8);
+  animation: status-blink 2s ease-in-out infinite;
+}
+
+@keyframes status-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.agent-panel-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.agent-panel-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  transform: rotate(90deg);
+}
+
+/* ---------- 8.3 模式选择器 ---------- */
+
+.agent-mode-selector {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.agent-mode-btn {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-mode-btn .mode-icon { font-size: 16px; line-height: 1; }
+.agent-mode-btn .mode-label { font-size: 10px; letter-spacing: 0.3px; }
+
+.agent-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.agent-mode-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--level-2)) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow:
+    0 4px 20px rgba(74, 158, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ---------- 8.4 消息区域 ---------- */
+
+.agent-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scroll-behavior: smooth;
+}
+
+.agent-messages::-webkit-scrollbar { width: 6px; }
+.agent-messages::-webkit-scrollbar-track { background: transparent; }
+.agent-messages::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
+.agent-messages::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* 消息通用 */
+.agent-message {
+  display: flex;
+  gap: 10px;
+  max-width: 88%;
+  animation: message-in 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.agent-message.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.agent-message .message-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.agent-message.user .message-avatar {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.agent-message.ai .message-avatar {
+  background: linear-gradient(135deg, var(--accent), var(--level-2));
+  color: #fff;
+  box-shadow: 0 0 12px rgba(74, 158, 255, 0.4);
+}
+
+.agent-message .message-bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.agent-message.user .message-bubble {
+  background: linear-gradient(135deg, var(--accent), var(--level-2));
+  color: #fff;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 20px rgba(74, 158, 255, 0.3);
+}
+
+.agent-message.ai .message-bubble {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border-bottom-left-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* ---------- 8.5 Think/Act 步骤可视化 ---------- */
+
+.agent-step-card {
+  position: relative;
+  margin: 8px 0;
+  padding: 12px 14px 12px 18px;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.agent-step-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.agent-step-card[data-type="think"]::before { background: #4a9eff; box-shadow: 0 0 10px rgba(74, 158, 255, 0.6); }
+.agent-step-card[data-type="act"]::before { background: #48bb78; box-shadow: 0 0 10px rgba(72, 187, 120, 0.6); }
+.agent-step-card[data-type="tool"]::before { background: #9f7aea; box-shadow: 0 0 10px rgba(159, 122, 234, 0.6); }
+.agent-step-card[data-type="plan"]::before { background: #ecc94b; box-shadow: 0 0 10px rgba(236, 201, 75, 0.6); }
+
+.agent-step-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateX(3px);
+}
+
+.agent-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.agent-step-number {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  min-width: 20px;
+}
+
+.agent-step-type {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.agent-step-type.think { background: rgba(74, 158, 255, 0.15); color: #4a9eff; }
+.agent-step-type.act { background: rgba(72, 187, 120, 0.15); color: #48bb78; }
+.agent-step-type.tool { background: rgba(159, 122, 234, 0.15); color: #9f7aea; }
+.agent-step-type.plan { background: rgba(236, 201, 75, 0.15); color: #ecc94b; }
+
+.agent-step-toggle {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-step-card.expanded .agent-step-toggle {
+  transform: rotate(90deg);
+}
+
+.agent-step-content {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-step-card.expanded .agent-step-content {
+  max-height: 500px;
+  opacity: 1;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ---------- 8.6 工具调用卡片 ---------- */
+
+.agent-tool-call {
+  margin: 8px 0;
+  padding: 12px 14px;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  background: rgba(159, 122, 234, 0.06);
+  border: 1px solid rgba(159, 122, 234, 0.2);
+  border-radius: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-tool-call:hover {
+  border-color: rgba(159, 122, 234, 0.4);
+  background: rgba(159, 122, 234, 0.1);
+}
+
+.agent-tool-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.agent-tool-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9f7aea;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-tool-status {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-tool-status.running { background: rgba(74, 158, 255, 0.15); color: #4a9eff; }
+.agent-tool-status.running::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(74, 158, 255, 0.3);
+  border-top-color: #4a9eff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.agent-tool-status.success { background: rgba(72, 187, 120, 0.15); color: #48bb78; }
+.agent-tool-status.success::before { content: '\2713'; font-weight: bold; }
+.agent-tool-status.error { background: rgba(245, 101, 101, 0.15); color: #f56565; }
+.agent-tool-status.error::before { content: '\2715'; font-weight: bold; }
+
+.agent-tool-params,
+.agent-tool-result {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.agent-tool-params .param-label,
+.agent-tool-result .result-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* ---------- 8.7 执行轨迹时间线 ---------- */
+
+.agent-trace-timeline {
+  position: relative;
+  padding: 12px 0 12px 24px;
+  margin: 12px 0;
+}
+
+.agent-trace-timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 16px;
+  bottom: 16px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--level-2), transparent);
+  border-radius: 1px;
+}
+
+.agent-trace-node {
+  position: relative;
+  padding: 8px 0 16px 0;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-trace-node:last-child { padding-bottom: 0; }
+
+.agent-trace-node::before {
+  content: '';
+  position: absolute;
+  left: -21px;
+  top: 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid rgba(10, 10, 20, 0.9);
+  box-shadow: 0 0 12px rgba(74, 158, 255, 0.6);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.agent-trace-node.completed::before {
+  background: #48bb78;
+  box-shadow: 0 0 12px rgba(72, 187, 120, 0.6);
+}
+
+.agent-trace-node.running::before {
+  background: #4a9eff;
+  animation: node-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes node-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(74, 158, 255, 0.5); transform: scale(1); }
+  50% { box-shadow: 0 0 24px rgba(74, 158, 255, 0.9); transform: scale(1.3); }
+}
+
+.agent-trace-node:hover::before { transform: scale(1.4); }
+
+.agent-trace-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-trace-phase {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.agent-trace-time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: auto;
+  font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+.agent-trace-detail {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-trace-node.expanded .agent-trace-detail {
+  max-height: 200px;
+  opacity: 1;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ---------- 8.8 流式输出区域 ---------- */
+
+.agent-streaming {
+  padding: 12px 14px;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  position: relative;
+  min-height: 40px;
+}
+
+.agent-streaming .streaming-text {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(159, 122, 234, 0.85));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: stream-fade 0.6s ease;
+}
+
+@keyframes stream-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.agent-streaming .streaming-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--accent);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink-caret 0.8s steps(2) infinite;
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.7);
+}
+
+@keyframes blink-caret {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* ---------- 8.9 输入区域 ---------- */
+
+.agent-input-area {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(255, 255, 255, 0.04);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.agent-input-wrapper {
+  flex: 1;
+  position: relative;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-input-wrapper:focus-within {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px rgba(74, 158, 255, 0.12),
+    0 0 24px rgba(74, 158, 255, 0.2);
+}
+
+.agent-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #fff;
+  resize: none;
+  max-height: 120px;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.agent-input::placeholder { color: rgba(255, 255, 255, 0.3); }
+
+.agent-send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--level-2));
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(74, 158, 255, 0.35);
+}
+
+.agent-send-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 28px rgba(74, 158, 255, 0.5),
+    0 0 0 1px rgba(74, 158, 255, 0.2);
+}
+
+.agent-send-btn:active { transform: scale(0.95); }
+.agent-send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* ---------- 8.10 浮动按钮 ---------- */
+
+.enhanced-agent-fab,
+.agent-fab {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--level-2));
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  z-index: 999;
+  box-shadow:
+    0 8px 32px rgba(74, 158, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.enhanced-agent-fab::before,
+.agent-fab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: pulse-ring 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.enhanced-agent-fab:hover,
+.agent-fab:hover {
+  transform: scale(1.1) rotate(15deg);
+  box-shadow:
+    0 12px 40px rgba(74, 158, 255, 0.7),
+    0 0 0 4px rgba(74, 158, 255, 0.15);
+}
+
+.enhanced-agent-fab:active,
+.agent-fab:active { transform: scale(1.05) rotate(15deg); }
+
+.enhanced-agent-fab svg,
+.enhanced-agent-fab .enhanced-agent-fab-icon,
+.agent-fab svg,
+.agent-fab .icon {
+  width: 28px;
+  height: 28px;
+  z-index: 1;
+  font-size: 24px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* 脉冲扩散 */
+.enhanced-agent-fab-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: fab-pulse-spread 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes fab-pulse-spread {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* ============================================================
+ * 9. 微交互动画 (Micro-interactions)
+ * ============================================================ */
+
+@keyframes count-up {
+  0% { transform: translateY(8px); opacity: 0; }
+  50% { transform: translateY(-4px); opacity: 0.8; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.stat-value,
+.count-number,
+.dynamic-number {
+  animation: count-up 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton,
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  border-radius: 6px;
+}
+
+.home-stat-card,
+.quick-action-card {
+  cursor: pointer;
+}
+
+button:active,
+.btn-primary:active,
+.btn-secondary:active,
+.btn-ghost:active {
+  transform: scale(0.97);
+}
+
+/* ============================================================
+ * 10. 统计数字发光效果 (Glowing Stats)
+ * ============================================================ */
+
+.stat-value,
+.stat-number {
+  background: linear-gradient(135deg, #fff, var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+}
+
+/* ============================================================
+ * 10.5 标题渐变文字效果 (Gradient Titles)
+ * ============================================================ */
+
+.home-welcome-banner h1,
+.home-welcome-banner .welcome-title,
+.home-welcome-banner .banner-title {
+  background: linear-gradient(135deg, #ffffff 0%, #4a9eff 50%, #9f7aea 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+}
+
+/* 区块标题渐变 */
+h3:has(.emoji),
+.quick-actions-title,
+.home-section-title {
+  background: linear-gradient(135deg, #ffffff, rgba(74, 158, 255, 0.8));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 导航品牌渐变文字 */
+.nav-brand .brand-text {
+  background: linear-gradient(135deg, #4a9eff, #9f7aea);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* ============================================================
+ * 10.6 卡片内部彩色发光 (Inner Glow)
+ * ============================================================ */
+
+.home-stat-card {
+  position: relative;
+}
+
+.home-stat-card::after {
+  box-shadow: inset 0 0 60px rgba(74, 158, 255, 0.04);
+}
+
+/* ============================================================
+ * 11. 快捷入口卡片图标增强
+ * ============================================================ */
+
+.quick-action-card .icon,
+.quick-action-card .emoji {
+  font-size: 28px;
+  filter: drop-shadow(0 2px 8px rgba(74, 158, 255, 0.3));
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.quick-action-card:hover .icon,
+.quick-action-card:hover .emoji {
+  transform: scale(1.15) translateY(-2px);
+  filter: drop-shadow(0 4px 12px rgba(74, 158, 255, 0.5));
+}
+
+/* ============================================================
+ * 12. 响应式适配 (Responsive)
+ * ============================================================ */
+
+@media (max-width: 1024px) {
+  .agent-panel { width: 380px; }
+  .enhanced-agent-fab, .agent-fab { bottom: 24px; right: 24px; width: 54px; height: 54px; }
+}
+
+@media (max-width: 768px) {
+  .agent-panel { width: 100%; max-width: 100%; }
+  .home-stats-grid, .quick-actions-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .navbar, .nav-bar { padding: 0 12px; }
+  .nav-tab, .nav-item, .tab-item { padding: 8px 10px; font-size: 12px; }
+  .enhanced-agent-fab, .agent-fab { bottom: 20px; right: 20px; width: 52px; height: 52px; }
+  .agent-mode-btn .mode-label { display: none; }
+  .agent-mode-btn { padding: 10px; }
+  .agent-mode-btn .mode-icon { font-size: 18px; }
+}
+
+@media (max-width: 480px) {
+  .home-stats-grid, .quick-actions-grid { grid-template-columns: 1fr; }
+  .agent-messages { padding: 12px; }
+  .agent-input-area { padding: 12px; }
+}
+
+/* ============================================================
+ * 13. 浅色主题适配 (Light Theme)
+ * ============================================================ */
+
+body.light-theme {
+  background: transparent !important;
+}
+
+body.light-theme::before {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(74, 158, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(159, 122, 234, 0.06) 0%, transparent 50%),
+    linear-gradient(180deg, #f0f4f8 0%, #e8edf3 50%, #f0f4f8 100%) !important;
+}
+
+body.light-theme .cg-orb-blue {
+  background: radial-gradient(circle, rgba(74, 158, 255, 0.15) 0%, transparent 65%);
+}
+
+body.light-theme .cg-orb-purple {
+  background: radial-gradient(circle, rgba(159, 122, 234, 0.12) 0%, transparent 65%);
+}
+
+body.light-theme .cg-orb-cyan {
+  background: radial-gradient(circle, rgba(0, 200, 255, 0.08) 0%, transparent 65%);
+}
+
+body.light-theme .home-stat-card,
+body.light-theme .quick-action-card,
+body.light-theme .word-detail-card,
+body.light-theme .vocab-card,
+body.light-theme .review-card {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 8px 32px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .home-stat-card:hover,
+body.light-theme .quick-action-card:hover,
+body.light-theme .word-detail-card:hover,
+body.light-theme .vocab-card:hover,
+body.light-theme .review-card:hover {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(74, 158, 255, 0.3) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 16px 48px rgba(0, 0, 0, 0.1),
+    0 0 30px rgba(74, 158, 255, 0.1) !important;
+}
+
+body.light-theme .home-welcome-banner {
+  background: linear-gradient(135deg, rgba(74, 158, 255, 0.1), rgba(159, 122, 234, 0.08)) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-theme .navbar,
+body.light-theme .nav-bar,
+body.light-theme .nav-container {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-theme .nav-tab:hover,
+body.light-theme .nav-item:hover,
+body.light-theme .tab-item:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+body.light-theme .agent-panel {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-left: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: -24px 0 80px rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-theme .agent-panel-header {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-theme .agent-panel-title .title { color: #1a1a2e; }
+body.light-theme .agent-panel-title .subtitle { color: rgba(0, 0, 0, 0.5); }
+body.light-theme .agent-panel-close { background: rgba(0, 0, 0, 0.04); border: 1px solid rgba(0, 0, 0, 0.08); color: rgba(0, 0, 0, 0.6); }
+body.light-theme .agent-panel-close:hover { background: rgba(0, 0, 0, 0.08); color: #1a1a2e; }
+body.light-theme .agent-mode-selector { background: rgba(0, 0, 0, 0.02); border-bottom: 1px solid rgba(0, 0, 0, 0.04); }
+body.light-theme .agent-mode-btn { background: rgba(0, 0, 0, 0.03); border: 1px solid rgba(0, 0, 0, 0.06); color: rgba(0, 0, 0, 0.5); }
+body.light-theme .agent-mode-btn:hover { background: rgba(0, 0, 0, 0.06); color: rgba(0, 0, 0, 0.8); }
+body.light-theme .agent-mode-btn.active { background: linear-gradient(135deg, var(--accent), var(--level-2)) !important; color: #fff !important; }
+body.light-theme .agent-messages::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); }
+body.light-theme .agent-message.user .message-avatar { background: rgba(0, 0, 0, 0.08); color: rgba(0, 0, 0, 0.8); }
+body.light-theme .agent-message.ai .message-bubble { background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(0, 0, 0, 0.06); color: #1a1a2e; }
+body.light-theme .agent-step-card { background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(0, 0, 0, 0.06); }
+body.light-theme .agent-step-card:hover { background: rgba(255, 255, 255, 0.9); border-color: rgba(0, 0, 0, 0.1); }
+body.light-theme .agent-step-number { color: rgba(0, 0, 0, 0.4); }
+body.light-theme .agent-step-content { color: rgba(0, 0, 0, 0.7); border-top: 1px solid rgba(0, 0, 0, 0.06); }
+body.light-theme .agent-tool-call { background: rgba(159, 122, 234, 0.05); border: 1px solid rgba(159, 122, 234, 0.15); }
+body.light-theme .agent-tool-params, body.light-theme .agent-tool-result { background: rgba(0, 0, 0, 0.04); color: rgba(0, 0, 0, 0.7); }
+body.light-theme .agent-trace-node::before { border-color: rgba(255, 255, 255, 0.9); }
+body.light-theme .agent-trace-phase { color: #1a1a2e; }
+body.light-theme .agent-trace-time { color: rgba(0, 0, 0, 0.4); }
+body.light-theme .agent-trace-detail { color: rgba(0, 0, 0, 0.6); border-top: 1px solid rgba(0, 0, 0, 0.06); }
+body.light-theme .agent-streaming { background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(0, 0, 0, 0.06); }
+body.light-theme .agent-input-area { background: rgba(255, 255, 255, 0.6); border-top: 1px solid rgba(0, 0, 0, 0.06); }
+body.light-theme .agent-input-wrapper { background: rgba(0, 0, 0, 0.03); border: 1px solid rgba(0, 0, 0, 0.08); }
+body.light-theme .agent-input-wrapper:focus-within { background: rgba(255, 255, 255, 0.9); border-color: var(--accent); }
+body.light-theme .agent-input { color: #1a1a2e; }
+body.light-theme .agent-input::placeholder { color: rgba(0, 0, 0, 0.3); }
+body.light-theme .skeleton, body.light-theme .loading-skeleton {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 25%, rgba(0, 0, 0, 0.08) 50%, rgba(0, 0, 0, 0.04) 75%);
+  background-size: 200% 100%;
+}
+body.light-theme .stat-value,
+body.light-theme .stat-number {
+  background: linear-gradient(135deg, #1a1a2e, var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+/* ============================================================
+ * 14. 无障碍与性能优化
+ * ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .cg-orb-blue, .cg-orb-purple, .cg-orb-cyan { animation: none !important; }
+}
+
+@supports not (backdrop-filter: blur(20px)) {
+  .home-stat-card,
+  .quick-action-card,
+  .home-welcome-banner,
+  .agent-panel,
+  .agent-panel-header,
+  .agent-input-area {
+    background: rgba(20, 20, 35, 0.95) !important;
+  }
+  body.light-theme .home-stat-card,
+  body.light-theme .quick-action-card,
+  body.light-theme .home-welcome-banner,
+  body.light-theme .agent-panel,
+  body.light-theme .agent-panel-header,
+  body.light-theme .agent-input-area {
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+}

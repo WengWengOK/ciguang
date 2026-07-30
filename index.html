@@ -5,8 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>词光 - 考研英语</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="enhanced-ui.css">
 </head>
 <body>
+    <!-- 环境光晕背景层 -->
+    <div class="cg-orb-blue"></div>
+    <div class="cg-orb-purple"></div>
+    <div class="cg-orb-cyan"></div>
     <!-- 导航栏 -->
     <nav class="navbar">
         <div class="nav-brand">
@@ -2357,5 +2362,14 @@
     </div>
 
     <div class="error-agent-overlay" id="error-agent-overlay" onclick="app.toggleErrorAgentPanel()"></div>
+
+    <!-- ===== 高级 AI Agent 面板（ReAct / Plan-Execute / Multi-Agent）===== -->
+    <div data-enhanced-agent id="enhanced-agent-container"></div>
+    <button data-enhanced-agent-trigger class="enhanced-agent-fab" id="enhanced-agent-fab" title="AI Agent">
+        <span class="enhanced-agent-fab-icon">🤖</span>
+        <span class="enhanced-agent-fab-pulse"></span>
+    </button>
+
+    <script src="enhanced-agent.js"></script>
 </body>
 </html>
