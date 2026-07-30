@@ -13709,6 +13709,88 @@ WordCollectionApp.prototype.toggleTutorPanel = function() {
 };
 
 /**
+ * 统一 Agent 模式切换（类似 DeepSeek 模式选择）
+ * chat: 普通对话 / deep: 深度思考 / error: 错题分析 / plan: 学习规划
+ */
+WordCollectionApp.prototype.switchTutorMode = function(mode) {
+    this.tutorMode = mode;
+
+    // 更新按钮激活状态
+    document.querySelectorAll('.tutor-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    // 模式配置
+    const modeConfig = {
+        chat: {
+            status: '在线 · 普通对话模式',
+            placeholder: '输入你的问题...',
+            templates: [
+                { text: '💡 这个词怎么记？', q: 'abandon怎么记？' },
+                { text: '📝 这个语法怎么用？', q: '定语从句怎么用？' },
+                { text: '📖 阅读技巧', q: '阅读总是做不完怎么办？' },
+                { text: '📅 制定计划', q: '帮我制定复习计划' }
+            ]
+        },
+        deep: {
+            status: '在线 · 深度思考模式（ReAct推理）',
+            placeholder: '输入需要深度分析的问题...',
+            templates: [
+                { text: '🧠 分析我的学情', q: '请深度分析我的英语学情，给出详细诊断' },
+                { text: '📚 词汇记忆策略', q: '请深度分析最高效的考研词汇记忆策略' },
+                { text: '📖 阅读理解方法论', q: '请深度分析考研阅读理解的解题方法论' },
+                { text: '✍️ 写作提升路径', q: '请深度分析我的写作如何从及格提升到高分' }
+            ]
+        },
+        error: {
+            status: '在线 · 错题分析模式',
+            placeholder: '输入错题分析相关的问题...',
+            templates: [
+                { text: '📊 分析错题', q: '分析我的错题' },
+                { text: '🎯 薄弱知识点', q: '我的薄弱知识点是什么' },
+                { text: '📝 出题练习', q: '帮我出几道练习题' },
+                { text: '💡 学习建议', q: '给我一些学习建议' }
+            ]
+        },
+        plan: {
+            status: '在线 · 学习规划模式（Plan-Execute）',
+            placeholder: '输入你的学习目标，AI将制定详细计划...',
+            templates: [
+                { text: '📅 30天冲刺计划', q: '帮我制定考研前30天的冲刺学习计划' },
+                { text: '📝 每日学习安排', q: '帮我制定每天的学习时间表' },
+                { text: '🎯 分阶段复习', q: '帮我制定分阶段的复习计划' },
+                { text: '📊 模考安排', q: '帮我安排模考和时间规划' }
+            ]
+        }
+    };
+
+    const config = modeConfig[mode] || modeConfig.chat;
+
+    // 更新状态文本
+    const statusEl = document.getElementById('tutor-status');
+    if (statusEl) statusEl.textContent = config.status;
+
+    // 更新输入框 placeholder
+    const input = document.getElementById('tutor-input');
+    if (input) input.placeholder = config.placeholder;
+
+    // 更新快捷模板
+    const templatesEl = document.getElementById('tutor-quick-templates');
+    if (templatesEl) {
+        templatesEl.innerHTML = '';
+        config.templates.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'tutor-quick-btn';
+            btn.textContent = t.text;
+            btn.onclick = () => this.sendQuickQuestion(t.q);
+            templatesEl.appendChild(btn);
+        });
+        // 重新显示快捷模板
+        templatesEl.style.display = '';
+    }
+};
+
+/**
  * 处理输入框按键事件
  */
 WordCollectionApp.prototype.handleTutorInputKey = function(event) {
@@ -13770,6 +13852,9 @@ WordCollectionApp.prototype.sendTutorMessage = async function() {
     const sendBtn = document.getElementById('tutor-btn-send');
     if (sendBtn) sendBtn.disabled = true;
 
+    // 获取当前模式
+    const mode = this.tutorMode || 'chat';
+
     try {
         // 隐藏打字指示器，创建流式消息气泡
         this.hideTutorTyping();
@@ -13777,31 +13862,85 @@ WordCollectionApp.prototype.sendTutorMessage = async function() {
 
         let fullContent = '';
 
-        await api.streamTutorChat(message, this.tutorSessionId,
-            // onToken: 逐字追加内容
-            (token, meta) => {
-                if (meta && meta.type === 'session' && meta.sessionId) {
-                    this.tutorSessionId = meta.sessionId;
+        if (mode === 'plan') {
+            // 学习规划模式：调用 Plan-Execute API（非流式）
+            const planResult = await this.callPlanExecute(message);
+            fullContent = planResult;
+            this.finalizeTutorStreamBubble(streamBubble, fullContent);
+        } else if (mode === 'error') {
+            // 错题分析模式：调用 error-agent 流式接口
+            await api.streamErrorAgentChat(message, this.errorAgentSessionId || null,
+                (token, meta) => {
+                    if (meta && meta.type === 'session' && meta.sessionId) {
+                        this.errorAgentSessionId = meta.sessionId;
+                    }
+                    if (token) {
+                        fullContent += token;
+                        this.updateTutorStreamBubble(streamBubble, fullContent);
+                    }
+                },
+                (finalContent) => {
+                    fullContent = finalContent || fullContent;
+                    this.finalizeTutorStreamBubble(streamBubble, fullContent);
+                },
+                (errMsg) => {
+                    console.error('错题分析失败:', errMsg);
+                    if (!fullContent) {
+                        fullContent = '抱歉，错题分析服务暂时不可用，请稍后再试。';
+                    }
+                    this.finalizeTutorStreamBubble(streamBubble, fullContent);
                 }
-                if (token) {
-                    fullContent += token;
-                    this.updateTutorStreamBubble(streamBubble, fullContent);
+            );
+        } else if (mode === 'deep') {
+            // 深度思考模式：前缀标记，调用 study-agent 流式接口
+            const deepMessage = '[深度思考] ' + message;
+            await api.streamTutorChat(deepMessage, this.tutorSessionId,
+                (token, meta) => {
+                    if (meta && meta.type === 'session' && meta.sessionId) {
+                        this.tutorSessionId = meta.sessionId;
+                    }
+                    if (token) {
+                        fullContent += token;
+                        this.updateTutorStreamBubble(streamBubble, fullContent);
+                    }
+                },
+                (finalContent) => {
+                    fullContent = finalContent || fullContent;
+                    this.finalizeTutorStreamBubble(streamBubble, fullContent);
+                },
+                (errMsg) => {
+                    console.error('深度思考失败:', errMsg);
+                    if (!fullContent) {
+                        fullContent = '抱歉，深度思考服务暂时不可用，请稍后再试。';
+                    }
+                    this.finalizeTutorStreamBubble(streamBubble, fullContent);
                 }
-            },
-            // onDone: 渲染最终格式 + 提取推荐动作
-            (finalContent) => {
-                fullContent = finalContent || fullContent;
-                this.finalizeTutorStreamBubble(streamBubble, fullContent);
-            },
-            // onError: 显示降级提示
-            (errMsg) => {
-                console.error('流式导师对话失败:', errMsg);
-                if (!fullContent) {
-                    fullContent = '抱歉，AI服务暂时不可用，请稍后再试。\n\n你也可以尝试非流式模式，或检查API Key配置。';
+            );
+        } else {
+            // 普通对话模式：调用 study-agent 流式接口
+            await api.streamTutorChat(message, this.tutorSessionId,
+                (token, meta) => {
+                    if (meta && meta.type === 'session' && meta.sessionId) {
+                        this.tutorSessionId = meta.sessionId;
+                    }
+                    if (token) {
+                        fullContent += token;
+                        this.updateTutorStreamBubble(streamBubble, fullContent);
+                    }
+                },
+                (finalContent) => {
+                    fullContent = finalContent || fullContent;
+                    this.finalizeTutorStreamBubble(streamBubble, fullContent);
+                },
+                (errMsg) => {
+                    console.error('流式导师对话失败:', errMsg);
+                    if (!fullContent) {
+                        fullContent = '抱歉，AI服务暂时不可用，请稍后再试。\n\n你也可以尝试非流式模式，或检查API Key配置。';
+                    }
+                    this.finalizeTutorStreamBubble(streamBubble, fullContent);
                 }
-                this.finalizeTutorStreamBubble(streamBubble, fullContent);
-            }
-        );
+            );
+        }
     } catch (err) {
         console.error('导师对话失败:', err);
         this.hideTutorTyping();
@@ -13809,6 +13948,55 @@ WordCollectionApp.prototype.sendTutorMessage = async function() {
     } finally {
         this.tutorIsSending = false;
         if (sendBtn) sendBtn.disabled = false;
+    }
+};
+
+/**
+ * 调用 Plan-Execute API（非流式，返回计划文本）
+ */
+WordCollectionApp.prototype.callPlanExecute = async function(message) {
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (api.token) headers['Authorization'] = `Bearer ${api.token}`;
+
+        const response = await fetch(`${api.baseUrl}/plan-execute/run`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ message })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.data) {
+            let result = '';
+
+            // 渲染计划
+            if (data.data.plan && data.data.plan.steps) {
+                result += '## 📋 学习计划\n\n';
+                data.data.plan.steps.forEach((step, i) => {
+                    result += `**步骤 ${i + 1}:** ${step.description || step.task || step}\n`;
+                    if (step.details) result += `   ${step.details}\n`;
+                    result += '\n';
+                });
+            }
+
+            // 渲染最终回复
+            if (data.data.reply) {
+                result += '---\n\n' + data.data.reply;
+            }
+
+            return result || JSON.stringify(data.data, null, 2);
+        } else {
+            return data.message || '计划生成失败，请稍后再试。';
+        }
+    } catch (err) {
+        console.error('Plan-Execute 调用失败:', err);
+        return '抱歉，学习规划服务暂时不可用：' + err.message + '\n\n请稍后再试，或切换到"普通对话"模式。';
     }
 };
 

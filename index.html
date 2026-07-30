@@ -2245,7 +2245,7 @@
         }
     </script>
 
-    <!-- ===== AI学习导师浮动按钮 + 聊天面板 ===== -->
+    <!-- ===== 统一 AI 学习导师浮动按钮 + 聊天面板 ===== -->
     <!-- 浮动按钮 -->
     <button class="tutor-fab" id="tutor-fab" onclick="app.toggleTutorPanel()">
         <span class="tutor-fab-icon">💬</span>
@@ -2259,8 +2259,8 @@
             <div class="tutor-header-info">
                 <span class="tutor-avatar">🤖</span>
                 <div>
-                    <div class="tutor-title">AI学习导师</div>
-                    <div class="tutor-status" id="tutor-status">在线 · 基于你的学情画像</div>
+                    <div class="tutor-title">词光 AI</div>
+                    <div class="tutor-status" id="tutor-status">在线 · 你的智能学习助手</div>
                 </div>
             </div>
             <div class="tutor-header-actions">
@@ -2275,8 +2275,8 @@
             <div class="tutor-msg tutor-msg-bot">
                 <div class="tutor-msg-avatar">🤖</div>
                 <div class="tutor-msg-bubble">
-                    <p>你好！我是你的AI英语学习导师 👋</p>
-                    <p>我可以基于你的学情画像，帮你解答词汇、语法、阅读、翻译、写作等问题，还能制定个性化学习计划。</p>
+                    <p>你好！我是词光 AI 👋</p>
+                    <p>选择下方模式，体验不同的学习功能。我可以帮你解答词汇、语法、阅读、写作等问题，分析错题，制定学习计划。</p>
                     <p class="tutor-welcome-hint">试试问我：</p>
                 </div>
             </div>
@@ -2288,6 +2288,26 @@
             <button class="tutor-quick-btn" onclick="app.sendQuickQuestion('定语从句怎么用？')">📝 这个语法怎么用？</button>
             <button class="tutor-quick-btn" onclick="app.sendQuickQuestion('阅读总是做不完怎么办？')">📖 阅读技巧</button>
             <button class="tutor-quick-btn" onclick="app.sendQuickQuestion('帮我制定复习计划')">📅 制定计划</button>
+        </div>
+
+        <!-- 模式选择器（类似 DeepSeek） -->
+        <div class="tutor-mode-bar" id="tutor-mode-bar">
+            <button class="tutor-mode-btn active" data-mode="chat" onclick="app.switchTutorMode('chat')">
+                <span class="tutor-mode-icon">💬</span>
+                <span class="tutor-mode-label">普通对话</span>
+            </button>
+            <button class="tutor-mode-btn" data-mode="deep" onclick="app.switchTutorMode('deep')">
+                <span class="tutor-mode-icon">🧠</span>
+                <span class="tutor-mode-label">深度思考</span>
+            </button>
+            <button class="tutor-mode-btn" data-mode="error" onclick="app.switchTutorMode('error')">
+                <span class="tutor-mode-icon">📊</span>
+                <span class="tutor-mode-label">错题分析</span>
+            </button>
+            <button class="tutor-mode-btn" data-mode="plan" onclick="app.switchTutorMode('plan')">
+                <span class="tutor-mode-icon">📋</span>
+                <span class="tutor-mode-label">学习规划</span>
+            </button>
         </div>
 
         <!-- 输入区域 -->
@@ -2307,69 +2327,5 @@
 
     <!-- 聊天面板遮罩（移动端） -->
     <div class="tutor-overlay" id="tutor-overlay" onclick="app.toggleTutorPanel()"></div>
-
-    <!-- ===== 错题库对话Agent浮动按钮 + 聊天面板 ===== -->
-    <button class="error-agent-fab" id="error-agent-fab" onclick="app.toggleErrorAgentPanel()">
-        <span class="error-agent-fab-icon">🔍</span>
-        <span class="error-agent-fab-pulse"></span>
-    </button>
-
-    <div class="error-agent-panel" id="error-agent-panel">
-        <div class="error-agent-panel-header">
-            <div class="error-agent-header-info">
-                <span class="error-agent-avatar">🔍</span>
-                <div>
-                    <div class="error-agent-title">错题分析助手</div>
-                    <div class="error-agent-status" id="error-agent-status">在线 · 基于你的错题库</div>
-                </div>
-            </div>
-            <div class="error-agent-header-actions">
-                <button class="error-agent-btn-clear" onclick="app.clearErrorAgentChat()" title="清除对话">🗑️</button>
-                <button class="error-agent-btn-close" onclick="app.toggleErrorAgentPanel()" title="关闭">✕</button>
-            </div>
-        </div>
-
-        <div class="error-agent-messages" id="error-agent-messages">
-            <div class="error-agent-msg error-agent-msg-bot">
-                <div class="error-agent-msg-avatar">🔍</div>
-                <div class="error-agent-msg-bubble">
-                    <p>你好！我是错题分析助手 📊</p>
-                    <p>我可以帮你分析错题规律、诊断薄弱知识点、生成针对性练习题。</p>
-                    <p class="error-agent-welcome-hint">试试问我：</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="error-agent-quick-templates" id="error-agent-quick-templates">
-            <button class="error-agent-quick-btn" onclick="app.sendErrorQuickQuestion('分析我的错题')">📊 分析错题</button>
-            <button class="error-agent-quick-btn" onclick="app.sendErrorQuickQuestion('我的薄弱知识点是什么')">🎯 薄弱知识点</button>
-            <button class="error-agent-quick-btn" onclick="app.sendErrorQuickQuestion('帮我出几道练习题')">📝 出题练习</button>
-            <button class="error-agent-quick-btn" onclick="app.sendErrorQuickQuestion('给我一些学习建议')">💡 学习建议</button>
-        </div>
-
-        <div class="error-agent-input-area">
-            <textarea
-                id="error-agent-input"
-                class="error-agent-input"
-                placeholder="输入你的问题..."
-                rows="1"
-                onkeydown="app.handleErrorAgentInputKey(event)"
-            ></textarea>
-            <button class="error-agent-btn-send" id="error-agent-btn-send" onclick="app.sendErrorAgentMessage()">
-                <span>发送</span>
-            </button>
-        </div>
-    </div>
-
-    <div class="error-agent-overlay" id="error-agent-overlay" onclick="app.toggleErrorAgentPanel()"></div>
-
-    <!-- ===== 高级 AI Agent 面板（ReAct / Plan-Execute / Multi-Agent）===== -->
-    <div data-enhanced-agent id="enhanced-agent-container"></div>
-    <button data-enhanced-agent-trigger class="enhanced-agent-fab" id="enhanced-agent-fab" title="AI Agent">
-        <span class="enhanced-agent-fab-icon">🤖</span>
-        <span class="enhanced-agent-fab-pulse"></span>
-    </button>
-
-    <script src="enhanced-agent.js"></script>
 </body>
 </html>
