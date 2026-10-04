@@ -18,6 +18,10 @@
             <span class="brand-icon">🏛️</span>
             <span class="brand-text">词光</span>
         </div>
+        <!-- 返回主页：非主页时显示，练习/复习/数据页都能一键回首页 -->
+        <button class="home-back-btn hidden" id="home-back-btn" onclick="app.switchPage('home')" title="返回主页">
+            <span class="home-back-icon">←</span><span class="home-back-text">返回主页</span>
+        </button>
         <div class="nav-tabs">
             <button class="nav-tab active" data-category="home" data-page="home">
                 <span>🏠</span> 学习中心
@@ -2228,16 +2232,25 @@
     <script src="agent-frontend.js"></script>
     <script src="app.js?v=34"></script>
     <script>
-        // Force fresh data on new word database
+        // 词库升级时刷新本地缓存：只替换词表，把用户的练习进度先备份下来
         if (typeof EMBEDDED_WORDS !== 'undefined') {
             const stored = localStorage.getItem('wordCollection_words');
             if (stored) {
                 try {
                     const parsed = JSON.parse(stored);
-                    // If stored word count differs from embedded, refresh
-                    if (parsed.length !== EMBEDDED_WORDS.length) {
+                    // 缓存词条数与内置词库不一致 → 说明词库更新过，需要刷新
+                    if (Array.isArray(parsed) && parsed.length !== EMBEDDED_WORDS.length) {
+                        // 备份练习进度，避免刷新词库时丢掉学习记录
+                        const progress = parsed.filter(w => w && ((w.correct_count || 0) > 0 || (w.wrong_count || 0) > 0 || w.is_favorite));
+                        if (progress.length) {
+                            localStorage.setItem('wordCollection_progress_backup', JSON.stringify(progress.map(w => ({
+                                id: w.id,
+                                correct_count: w.correct_count || 0,
+                                wrong_count: w.wrong_count || 0,
+                                is_favorite: w.is_favorite ? 1 : 0
+                            }))));
+                        }
                         localStorage.removeItem('wordCollection_words');
-                        localStorage.removeItem('wordCollection_activity');
                         location.reload();
                     }
                 } catch(e) {}

@@ -729,7 +729,8 @@ class WordCollectionApp {
     constructor() {
         this.words = [];
         this.filteredWords = [];
-        this.currentPage = 0;
+        this.currentPage = 0;           // 当前页面名（如 'home' / 'collection'）
+        this.collectionPageIndex = 0;   // 收藏室分页索引（数字），与 currentPage 分开，避免字符串/数字混用
         this.currentLetter = 'ALL';
         this.isLoading = false;
         this.settings = Storage.getSettings();
@@ -1720,6 +1721,10 @@ class WordCollectionApp {
 
         this.currentPage = page;
 
+        // 返回主页按钮：只要不在主页就显示，方便从练习/复习/数据页一键回首页
+        const homeBackBtn = document.getElementById('home-back-btn');
+        if (homeBackBtn) homeBackBtn.classList.toggle('hidden', page === 'home');
+
         // 4. 页面特定初始化
         this.initPageContent(page);
     }
@@ -1795,6 +1800,13 @@ class WordCollectionApp {
             this.initPredictionPage();
         } else if (page === 'exam-practice') {
             this.initExamPracticePage();
+        } else if (page === 'collection') {
+            // 收藏室：网格为空时补渲染一次（例如缓存被清空后再进来）
+            const grid = document.getElementById('collection-grid');
+            if (grid && grid.children.length === 0) {
+                this.collectionPageIndex = 0;
+                this.renderCollection();
+            }
         }
     }
 
@@ -2004,7 +2016,7 @@ class WordCollectionApp {
     
     filterByLetter(letter) {
         this.currentLetter = letter;
-        this.currentPage = 0;
+        this.collectionPageIndex = 0;
         
         // Update active state
         document.querySelectorAll('.letter-btn').forEach(btn => {
@@ -2028,21 +2040,23 @@ class WordCollectionApp {
     renderCollection() {
         const grid = document.getElementById('collection-grid');
         const pageSize = this.settings.pageSize || 100;
-        const start = this.currentPage * pageSize;
+        const start = this.collectionPageIndex * pageSize;
         const end = start + pageSize;
         const pageWords = this.filteredWords.slice(start, end);
         
-        if (pageWords.length === 0 && this.currentPage === 0) {
+        if (pageWords.length === 0 && this.collectionPageIndex === 0) {
             grid.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 40px;">暂无单词数据</div>';
             return;
         }
         
         const html = pageWords.map(word => this.createWordCard(word)).join('');
         
-        if (this.currentPage === 0) {
+        if (this.collectionPageIndex === 0) {
             grid.innerHTML = html;
         } else {
-            grid.innerHTML += html;
+            // 用追加而不是 innerHTML += ：后者会把已渲染的卡片全部重新解析一遍，
+            // 卡片累积到几千张时会越来越卡
+            grid.insertAdjacentHTML('beforeend', html);
         }
         
         this.isLoading = false;
@@ -2073,9 +2087,9 @@ class WordCollectionApp {
             const pageSize = this.settings.pageSize || 100;
             const maxPage = Math.ceil(this.filteredWords.length / pageSize) - 1;
             
-            if (this.currentPage < maxPage) {
+            if (this.collectionPageIndex < maxPage) {
                 this.isLoading = true;
-                this.currentPage++;
+                this.collectionPageIndex++;
                 document.getElementById('loading').style.display = 'flex';
                 
                 // Small delay for smooth loading
@@ -6491,7 +6505,7 @@ ${sentences.map((s, idx) => {
         
         // Refresh collection if page size changed
         if (this.currentPage === 'collection') {
-            this.currentPage = 0;
+            this.collectionPageIndex = 0;
             document.getElementById('collection-grid').innerHTML = '';
             this.renderCollection();
         }

@@ -568,26 +568,88 @@ const api = new ApiClient();
 
 // 兼容原有Storage接口的适配层
 const BackendStorage = {
-    // 单词数据 - 从后端获取
+    // 单词数据 - 从后端获取，并合并该用户的答题次数 / 收藏状态
     async getWords() {
-        // 先检查localStorage缓存
-        const cached = localStorage.getItem('wordCollection_words');
-        if (cached) {
-            try { return JSON.parse(cached); } catch(e) {}
-        }
-        // 尝试从后端获取
-        try {
-            if (api.isLoggedIn()) {
+        let words = null;
+
+        // 已登录：优先后端词表（收藏室的次数与颜色依赖 user_words 里的进度）
+        if (api.isLoggedIn()) {
+            try {
                 const response = await api.getWords({ limit: 10000 });
-                if (response.success) {
-                    return response.data.words;
+                if (response.success && Array.isArray(response.data?.words) && response.data.words.length) {
+                    words = await this._mergeUserProgress(response.data.words);
                 }
+            } catch (err) {
+                console.log('后端获取失败，使用本地数据:', err.message);
             }
-        } catch (err) {
-            console.log('后端获取失败，使用本地数据:', err.message);
         }
+
+        // 本地缓存（忽略空数组：空数组多半是被写坏的残留，会让收藏室显示“暂无单词数据”）
+        if (!words) {
+            const cached = localStorage.getItem('wordCollection_words');
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length) words = parsed;
+                } catch (e) { /* 缓存损坏，忽略 */ }
+            }
+        }
+
         // 降级到嵌入式数据
-        return (typeof EMBEDDED_WORDS !== 'undefined') ? EMBEDDED_WORDS : null;
+        if (!words && typeof EMBEDDED_WORDS !== 'undefined') {
+            words = EMBEDDED_WORDS;
+        }
+        if (!words) return null;
+
+        // 词库升级时备份下来的进度合并回去
+        words = this.applyProgressBackup(words);
+        return words;
+    },
+
+    // 把 /api/words/user/progress 的进度合并进词表对象
+    // 收藏室的卡片颜色由 correct_count 决定，没有这一步永远是绿色 0 次
+    async _mergeUserProgress(words) {
+        try {
+            const response = await api.getUserProgress();
+            if (!response || !response.success || !Array.isArray(response.data)) {
+                return words;
+            }
+            const byWordId = new Map();
+            response.data.forEach(p => byWordId.set(p.word_id, p));
+            words.forEach(w => {
+                const p = byWordId.get(w.id);
+                if (!p) return;
+                w.correct_count = p.correct_count || 0;
+                w.wrong_count = p.wrong_count || 0;
+                w.is_favorite = p.is_favorite || 0;
+            });
+        } catch (err) {
+            console.log('合并学习进度失败:', err.message);
+        }
+        return words;
+    },
+
+    // 合并“词库升级”前备份的进度（取较大值，避免覆盖已有数据）
+    applyProgressBackup(words) {
+        const raw = localStorage.getItem('wordCollection_progress_backup');
+        if (!raw || !Array.isArray(words) || !words.length) return words;
+        try {
+            const saved = JSON.parse(raw);
+            if (!Array.isArray(saved) || !saved.length) return words;
+            const byId = new Map();
+            saved.forEach(p => byId.set(p.id, p));
+            words.forEach(w => {
+                const p = byId.get(w.id);
+                if (!p) return;
+                w.correct_count = Math.max(w.correct_count || 0, p.correct_count || 0);
+                w.wrong_count = Math.max(w.wrong_count || 0, p.wrong_count || 0);
+                if (p.is_favorite) w.is_favorite = 1;
+            });
+            localStorage.removeItem('wordCollection_progress_backup');
+        } catch (e) {
+            console.log('恢复学习进度备份失败:', e.message);
+        }
+        return words;
     },
 
     // 用户单词进度
@@ -617,13 +679,15 @@ const BackendStorage = {
             console.log('后端保存失败，使用本地存储');
         }
         // 同时保存到localStorage作为备份
+        // 注意：只有真的命中了词条才写回，否则会把空数组写进缓存，
+        // 导致下次打开收藏室显示“暂无单词数据”
         const words = JSON.parse(localStorage.getItem('wordCollection_words') || '[]');
+        if (!Array.isArray(words) || words.length === 0) return;
         const word = words.find(w => w.id === wordId);
-        if (word) {
-            if (isCorrect) word.correct_count = (word.correct_count || 0) + 1;
-            else word.wrong_count = (word.wrong_count || 0) + 1;
-            if (isFavorite !== undefined) word.is_favorite = isFavorite;
-        }
+        if (!word) return;
+        if (isCorrect) word.correct_count = (word.correct_count || 0) + 1;
+        else word.wrong_count = (word.wrong_count || 0) + 1;
+        if (isFavorite !== undefined) word.is_favorite = isFavorite;
         localStorage.setItem('wordCollection_words', JSON.stringify(words));
     },
 

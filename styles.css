@@ -12157,3 +12157,43 @@ body.light-theme .blank-photo-dialog {
         grid-template-columns: 1fr;
     }
 }
+
+/* ===== 返回主页按钮（顶部导航栏内，非主页时显示） ===== */
+.home-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.home-back-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    transform: translateX(-2px);
+}
+
+.home-back-icon {
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+@media (max-width: 640px) {
+    .home-back-btn {
+        padding: 6px 9px;
+        font-size: 0.75rem;
+    }
+    .home-back-text {
+        display: none;   /* 窄屏只保留 ← 箭头，避免挤压导航 */
+    }
+}
