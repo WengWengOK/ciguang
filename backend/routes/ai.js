@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const rateLimit = require('express-rate-limit');
+const { chat, extractJSON, getActiveProvider, AIProvider } = require('../services/AIService');
 
 const router = express.Router();
 
@@ -10,6 +11,69 @@ const aiRateLimit = rateLimit({
     max: 10,
     message: { success: false, message: '请求过于频繁，请稍后再试' }
 });
+
+// 词性识别：沿用词库释义前缀的标注方式（n. / vt. / vi. / adj. / adv.）
+function detectPos(meaning) {
+    const m = (meaning || '').trim();
+    if (/^adj\.|^a\./.test(m)) return 'adj.';
+    if (/^adv\./.test(m)) return 'adv.';
+    if (/^vt\./.test(m)) return 'vt.';
+    if (/^vi\./.test(m)) return 'vi.';
+    if (/^v\./.test(m)) return 'v.';
+    if (/^n\./.test(m)) return 'n.';
+    if (/^prep\./.test(m)) return 'prep.';
+    return '';
+}
+
+// 无 AI Key 时的兜底例句：按词性给出语法一定成立的句子。
+// 注意不要写成"The {word} plays an important role..."——那样不管什么词性都硬塞进去，
+// 遇到动词/形容词就是病句。
+function buildFallbackExample(word, meaning) {
+    const pos = detectPos(meaning);
+    const w = String(word);
+    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+    if (pos === 'n.') {
+        return {
+            en: `Understanding ${w} is essential for learning English.`,
+            cn: `理解「${w}」对英语学习很重要。`,
+            fallback: true
+        };
+    }
+    if (pos === 'vt.' || pos === 'v.') {
+        return {
+            en: `They decided to ${w} it after a long discussion.`,
+            cn: `经过长时间讨论，他们决定这么做。`,
+            fallback: true
+        };
+    }
+    if (pos === 'vi.') {
+        return {
+            en: `Students should learn to ${w} in different situations.`,
+            cn: `学生应当学会在不同情境下灵活应对。`,
+            fallback: true
+        };
+    }
+    if (pos === 'adj.') {
+        return {
+            en: `It is ${w} for students to review lessons regularly.`,
+            cn: `对学生来说，定期复习是明智的。`,
+            fallback: true
+        };
+    }
+    if (pos === 'adv.') {
+        return {
+            en: `${capitalize(w)}, the results support this view.`,
+            cn: `因此，这些结果支持这一观点。`,
+            fallback: true
+        };
+    }
+    return {
+        en: `In the passage, the author uses the word "${w}" to express the main idea.`,
+        cn: `在这篇文章中，作者用「${w}」这个词来表达主旨。`,
+        fallback: true
+    };
+}
 
 // AI翻译评判
 router.post('/translation/evaluate', aiRateLimit, async (req, res) => {
@@ -97,49 +161,41 @@ router.post('/generate-example', aiRateLimit, async (req, res) => {
             return res.status(400).json({ success: false, message: '缺少单词参数' });
         }
         
-        const apiKey = process.env.DEEPSEEK_API_KEY;
-        if (!apiKey) {
-            return res.json({
-                success: true,
-                data: {
-                    en: `The ${word} plays an important role in our daily life.`,
-                    cn: `${word}在我们的日常生活中扮演着重要角色。`,
-                    fallback: true
-                }
-            });
+        // 未配置任何 AI Key：返回按词性生成的兜底句（前端会优先使用自己的模板库）
+        if (getActiveProvider() === AIProvider.LOCAL) {
+            return res.json({ success: true, data: buildFallbackExample(word, meaning) });
         }
         
-        const prompt = `请为单词"${word}"（含义：${meaning || '无'}）生成一个考研英语难度的例句，并提供中文翻译。
+        const pos = detectPos(meaning);
+        const prompt = `请为英语单词 "${word}" 造一个例句，并提供中文翻译。
+单词信息：词性 ${pos || '未标注'}；含义 ${meaning || '未提供'}
+
 要求：
-1. 例句长度适中，约15-25个单词
-2. 使用考研常见词汇和语法结构
-3. 语境自然、有意义
+1. 必须使用原形 "${word}"，不得改变词形（不加 -ing / -ed / -s），也不得换成其它词性
+2. 句子语法必须完全正确，特别注意冠词 a/an、主谓一致、时态一致
+3. 如果是及物动词，句中必须带宾语；如果是不及物动词，不要硬加宾语
+4. 难度对标考研英语，长度 15-25 词，语境自然具体
+5. 不要写"在日常生活中扮演重要角色"这类空洞的模板句
 
-请以JSON格式输出：{"en": "英文例句", "cn": "中文翻译"}`;
+只输出 JSON，不要任何解释：{"en": "英文例句", "cn": "中文翻译"}`;
 
-        const response = await axios.post(process.env.DEEPSEEK_API_URL, {
-            model: 'deepseek-chat',
-            messages: [{ role: 'user', content: prompt }],
+        // 走统一 AI 服务层：DashScope / DeepSeek 自动切换，并自动记录可观测性指标
+        const aiResult = await chat([{ role: 'user', content: prompt }], {
             temperature: 0.7,
-            max_tokens: 500
-        }, {
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            timeout: 30000
+            maxTokens: 300,
+            endpoint: '/api/ai/generate-example'
         });
         
-        const aiContent = response.data.choices[0].message.content;
-        let result;
-        try {
-            const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-            result = jsonMatch ? JSON.parse(jsonMatch[0]) : { en: aiContent, cn: '' };
-        } catch (e) {
-            result = { en: aiContent, cn: '' };
+        const parsed = extractJSON(aiResult.content);
+        if (parsed && parsed.en) {
+            return res.json({
+                success: true,
+                data: { en: String(parsed.en).trim(), cn: String(parsed.cn || '').trim() }
+            });
         }
+        // AI 输出不可解析时退回兜底句，避免把半截 JSON 当成例句返回给前端
+        return res.json({ success: true, data: buildFallbackExample(word, meaning) });
         
-        res.json({ success: true, data: result });
     } catch (err) {
         res.status(500).json({ success: false, message: '生成例句失败: ' + err.message });
     }

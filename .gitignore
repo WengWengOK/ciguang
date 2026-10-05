@@ -36,3 +36,6 @@ ciguang-competition-entry/_shared/js/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# 词库修复脚本的自动备份
+scripts/.backup/

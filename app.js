@@ -582,111 +582,145 @@ const LevelSystem = {
 // ===== 例句生成 =====
 const ExampleGenerator = {
     // 名词模板 (n.)
+    // 名词：一律用"裸名词"结构（不加 the/a），这样可数、不可数、复数都成立，
+    // 也不会出现 "The accommodations plays..." 这类主谓不一致
     nounTemplates: [
-        "The {word} plays an important role in our daily life.",
-        "Many people don't understand the true meaning of {word}.",
-        "The professor explained the concept of {word} in detail.",
-        "The {word} is often discussed in academic papers.",
         "Understanding {word} is essential for learning English.",
-        "The meaning of {word} has changed over time.",
         "In this context, {word} refers to something specific.",
-        "We should pay attention to the {word} when reading this passage.",
-        "The government has taken measures to deal with the {word}.",
-        "It is widely acknowledged that {word} has a significant impact on society.",
-        "Researchers have found that {word} can lead to unexpected results.",
-        "The {word} has become a hot topic in recent years.",
         "The book provides a comprehensive analysis of {word}.",
+        "Many people don't understand the true meaning of {word}.",
+        "The author emphasizes the importance of {word} throughout the text.",
         "A deep understanding of {word} helps us grasp the passage better.",
-        "The author emphasizes the importance of {word} throughout the text."
+        "The professor explained the concept of {word} in detail.",
+        "The meaning of {word} has changed over time.",
+        "Researchers have paid much attention to {word} in recent years.",
+        "We should pay attention to {word} when reading this passage.",
+        "The passage gives a detailed description of {word}.",
+        "The discussion of {word} appears in many academic papers.",
+        "This chapter focuses on the role of {word} in modern society.",
+        "Students often find {word} difficult to understand at first.",
+        "The lecture offered a new perspective on {word}."
     ],
     // 动词模板 (v./vt./vi.)
-    verbTemplates: [
+    // 及物动词(vt.)：后面必须带宾语，统一用中性宾语 it，保证句子语法成立
+    vtTemplates: [
+        "In the exam, you need to know how to {word} it correctly.",
+        "Students should practice how to {word} it in different situations.",
+        "They decided to {word} it after a long discussion.",
+        "The ability to {word} it is considered a key skill in modern education.",
+        "One of the biggest challenges is how to {word} it effectively.",
+        "Learning to {word} it properly takes years of practice.",
+        "You must {word} it if you want to achieve your goals.",
+        "Scientists continue to {word} it in order to find new solutions.",
+        "It is important to {word} it at the right time.",
+        "The new policy aims to help citizens {word} it more easily."
+    ],
+    // 不及物动词(vi.)：不能带宾语
+    viTemplates: [
         "In the exam, you need to know how to {word} correctly.",
-        "The author used {word} to express his ideas clearly.",
-        "Students should practice how to {word} in different situations.",
-        "She tried to {word} but failed in the end.",
-        "They decided to {word} after a long discussion.",
+        "Many young people choose to {word} during their college years.",
+        "Students should learn to {word} in different situations.",
+        "It is not always easy to {word} at the right moment.",
+        "Scientists continue to {word} in order to find new solutions.",
         "The ability to {word} is considered a key skill in modern education.",
         "One of the biggest challenges is how to {word} effectively.",
         "Learning to {word} properly takes years of practice.",
-        "You must {word} if you want to achieve your goals.",
-        "The teacher asked students to {word} in their homework.",
-        "Scientists continue to {word} in order to find new solutions.",
-        "It is important to {word} at the right time.",
-        "Many young people choose to {word} during their college years.",
         "Parents often encourage children to {word} from an early age.",
-        "The new policy aims to help citizens {word} more easily."
+        "You need to {word} if you want to achieve your goals."
     ],
     // 形容词模板 (adj.)
     adjTemplates: [
-        "The professor gave a {word} explanation of the theory.",
+        "The professor gave {a} {word} explanation of the theory.",
         "It is {word} for students to review lessons regularly.",
         "The results of the experiment were quite {word}.",
-        "A {word} attitude is essential for success.",
+        "{A} {word} attitude is essential for success.",
         "The city has become increasingly {word} in recent years.",
         "Many people find it {word} to balance work and life.",
-        "The novel describes a {word} scene that impresses readers.",
-        "Students should develop a {word} habit of reading.",
-        "The environment here is {word} for studying.",
+        "The novel describes {a} {word} scene that impresses readers.",
+        "Students should develop {a} {word} habit of reading.",
         "His performance in the exam was truly {word}.",
-        "A {word} approach can solve this problem effectively.",
-        "The teacher is {word} and always helps students patiently.",
+        "{A} {word} approach can solve this problem effectively.",
         "It is {word} to prepare well before the examination.",
         "The new technology makes our life more {word}.",
-        "Maintaining a {word} lifestyle benefits our health."
+        "Maintaining {a} {word} lifestyle benefits our health.",
+        "The author gives {a} {word} account of the event."
     ],
     // 副词模板 (adv.)
     advTemplates: [
-        "She {word} finished her homework before dinner.",
-        "The team worked {word} to meet the deadline.",
-        "He {word} agreed with the professor's viewpoint.",
-        "The situation has {word} improved over the past decade.",
-        "Students should {word} check their answers before submission.",
-        "The theory can be {word} applied to real-world problems.",
-        "They {word} discussed the plan for three hours.",
-        "The data shows that the economy is recovering {word}.",
-        "You need to think {word} before making a decision.",
-        "The author {word} describes the beauty of nature.",
-        "Children learn languages {word} at a young age.",
-        "The project was completed {word} ahead of schedule.",
-        "He spoke {word} during the academic conference.",
-        "The medicine works {word} to relieve pain.",
-        "We should {word} follow the guidelines provided."
+        "{Word}, the results support this view.",
+        "{Word}, the author draws a different conclusion.",
+        "{Word}, we should pay attention to the details.",
+        "{Word}, many students make the same mistake.",
+        "{Word}, the data shows a clear trend.",
+        "{Word}, it is necessary to review the plan.",
+        "{Word}, the experiment produced similar results.",
+        "{Word}, readers should note the author's tone."
     ],
     // 通用模板（无法判断词性时使用）
     generalTemplates: [
-        "In the exam, you need to know how to use {word} correctly.",
-        "Students should practice using {word} in sentences.",
-        "The author used {word} to express his ideas clearly.",
-        "Understanding {word} is essential for learning English.",
-        "The meaning of {word} has changed over time.",
-        "In this context, {word} refers to something specific.",
-        "The book provides a comprehensive analysis of {word}.",
-        "Many people don't understand the true meaning of {word}."
+        'In the exam, you need to know how to use "{word}" correctly.',
+        'Students should practice using "{word}" in sentences.',
+        'The author used "{word}" to express his ideas clearly.',
+        'Understanding "{word}" is essential for learning English.',
+        'The meaning of "{word}" has changed over time.',
+        'In this context, "{word}" refers to something specific.',
+        'The book provides a comprehensive analysis of "{word}".',
+        'Many people don\'t understand the true meaning of "{word}".'
     ],
 
     _lastTemplateIndex: -1,
     _lastTemplateType: '',
 
+    // 以元音"音素"开头才用 an（hour 的 h 不发音；university/one 读 /juː/、/w/ 要用 a）
+    _startsWithVowelSound(word) {
+        const w = String(word || '').toLowerCase();
+        if (/^(hour|honest|honor|honour|heir)/.test(w)) return true;
+        if (/^(uni|use|usu|eu|one|once|u[^aeiou])/.test(w)) return false;
+        return /^[aeiou]/.test(w);
+    },
+
+    articleFor(word) {
+        return this._startsWithVowelSound(word) ? 'an' : 'a';
+    },
+
+    capitalize(text) {
+        const s = String(text || '');
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    },
+
     getPos(wordObj) {
         if (!wordObj || !wordObj.meaning) return 'general';
         const m = wordObj.meaning.trim();
-        if (m.startsWith('adj.')) return 'adj';
-        if (m.startsWith('adv.')) return 'adv';
-        if (m.startsWith('vt.') || m.startsWith('vi.') || m.startsWith('v.')) return 'verb';
-        if (m.startsWith('n.')) return 'noun';
-        if (m.startsWith('prep.') || m.startsWith('art.') || m.startsWith('conj.')) return 'general';
+        if (/^adj\.|^a\./.test(m)) return 'adj';
+        if (/^adv\./.test(m)) return 'adv';
+        if (/^vt\./.test(m)) return 'vt';
+        if (/^vi\./.test(m)) return 'vi';
+        if (/^v\./.test(m)) return 'verb';
+        if (/^n\./.test(m)) return 'noun';
+        if (/^prep\.|^art\.|^conj\./.test(m)) return 'general';
         return 'general';
     },
 
     getTemplatesByPos(pos) {
         switch (pos) {
             case 'noun': return this.nounTemplates;
-            case 'verb': return this.verbTemplates;
+            case 'vt': return this.vtTemplates;
+            case 'vi': return this.viTemplates;
+            case 'verb': return this.vtTemplates;   // 无法判断及物性时按及物处理
             case 'adj': return this.adjTemplates;
             case 'adv': return this.advTemplates;
             default: return this.generalTemplates;
         }
+    },
+
+    // 模板占位符：{word} 原词 / {Word} 句首大写 / {a}{A} 冠词
+    renderTemplate(template, word) {
+        const article = this.articleFor(word);
+        return template
+            .replace(/\{a\}/g, article)
+            .replace(/\{A\}/g, this.capitalize(article))
+            .replace(/\{Word\}/g, this.capitalize(word))
+            .replace(/\{word\}/g, word);
     },
 
     generate(wordObj, avoidIndex = -1) {
@@ -703,17 +737,19 @@ const ExampleGenerator = {
 
         this._lastTemplateIndex = idx;
         this._lastTemplateType = pos;
-        const template = templates[idx];
-        return template.replace('{word}', word);
+        return this.renderTemplate(templates[idx], word);
+    },
+
+    // 给任意英文句子里的目标词加高亮（AI 例句也复用这个方法）
+    highlight(sentence, word) {
+        const escaped = String(word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = String(word || '').length <= 2 ? `\\b${escaped}\\b` : escaped;
+        return String(sentence || '').replace(new RegExp(pattern, 'gi'), '<span class="highlight-word">$&</span>');
     },
 
     generateHighlighted(wordObj, avoidIndex = -1) {
-        const sentence = this.generate(wordObj, avoidIndex);
         const word = typeof wordObj === 'string' ? wordObj : wordObj.word;
-        const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const pattern = word.length <= 2 ? `\\b${escaped}\\b` : escaped;
-        const regex = new RegExp(pattern, 'gi');
-        return sentence.replace(regex, '<span class="highlight-word">$&</span>');
+        return this.highlight(this.generate(wordObj, avoidIndex), word);
     }
 };
 
@@ -2206,6 +2242,7 @@ class WordCollectionApp {
         
         // Generate highlighted example sentence
         this.currentExampleIndex = ExampleGenerator._lastTemplateIndex;
+        this.currentExampleCn = null;   // 换词后清掉上一句的参考翻译
         const highlightedExample = ExampleGenerator.generateHighlighted(word, this.currentExampleIndex);
         
         // Update word display
@@ -2243,7 +2280,7 @@ class WordCollectionApp {
         document.getElementById('standard-answer').style.display = 'none';
     }
     
-    refreshExample() {
+    async refreshExample() {
         const word = this.currentPracticeWord;
         if (!word) return;
         
@@ -2255,14 +2292,27 @@ class WordCollectionApp {
         refreshBtn.disabled = true;
         refreshBtn.textContent = '⏳';
         
-        setTimeout(() => {
-            // Generate new highlighted example (avoiding current)
-            const highlightedExample = ExampleGenerator.generateHighlighted(word, this.currentExampleIndex);
-            sentenceEl.innerHTML = highlightedExample;
-            sentenceEl.classList.remove('refreshing');
-            refreshBtn.disabled = false;
-            refreshBtn.textContent = '🔄 刷新例句';
-        }, 300);
+        // 先尝试用 AI 生成真实例句；未配置 Key 或请求失败时回退到本地模板
+        let highlightedExample = null;
+        this.currentExampleCn = null;
+        try {
+            const res = await api.generateExample(word.word, word.meaning);
+            const data = res && res.success ? res.data : null;
+            if (data && data.en && !data.fallback) {
+                highlightedExample = ExampleGenerator.highlight(data.en, word.word);
+                this.currentExampleCn = data.cn || null;
+            }
+        } catch (e) {
+            console.debug('AI 例句不可用，改用本地模板:', e.message);
+        }
+        if (!highlightedExample) {
+            highlightedExample = ExampleGenerator.generateHighlighted(word, this.currentExampleIndex);
+        }
+
+        sentenceEl.innerHTML = highlightedExample;
+        sentenceEl.classList.remove('refreshing');
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '🔄 刷新例句';
     }
     
     async submitTranslation() {
@@ -2424,7 +2474,8 @@ class WordCollectionApp {
         
         // Generate a reference translation for the example sentence
         const exampleText = document.getElementById('example-sentence').textContent;
-        const referenceTranslation = this.generateReferenceTranslation(word, exampleText);
+        // AI 例句自带中文翻译时优先用它，否则按模板片段推断
+        const referenceTranslation = this.currentExampleCn || this.generateReferenceTranslation(word, exampleText);
         
         answerText.textContent = `${word.word}：${word.meaning}`;
         if (referenceTranslation) {
@@ -2436,33 +2487,52 @@ class WordCollectionApp {
     generateReferenceTranslation(word, exampleText) {
         // Simple reference translation based on the example template
         const templates = {
-            'plays an important role': '在...中扮演重要角色',
-            "don't understand": '不理解',
-            'true meaning': '真正含义',
-            'explained the concept': '解释了...的概念',
-            'need to know': '需要知道',
-            'use correctly': '正确使用',
-            'often discussed': '经常被讨论',
+            'understanding': '理解',
             'is essential for': '对...至关重要',
-            'used to express': '用来表达',
-            'should practice': '应该练习',
-            'has changed over time': '随着时间的推移发生了变化',
-            'refers to': '指的是',
+            'refers to something specific': '指的是某个具体事物',
+            'comprehensive analysis of': '对...的全面分析',
+            "don't understand the true meaning of": '不理解...的真正含义',
+            'emphasizes the importance of': '强调...的重要性',
+            'a deep understanding of': '对...的深入理解',
+            'explained the concept of': '解释了...的概念',
+            'has changed over time': '随时间发生了变化',
+            'paid much attention to': '对...给予了大量关注',
             'pay attention to': '注意',
-            'taken measures': '采取措施',
-            'deal with': '处理',
-            'widely acknowledged': '被广泛认可',
-            'significant impact': '重大影响',
-            'lead to': '导致',
-            'hot topic': '热门话题',
-            'tried to': '试图',
+            'detailed description of': '对...的详细描述',
+            'discussion of': '关于...的讨论',
+            'focuses on the role of': '聚焦于...的作用',
+            'difficult to understand': '难以理解',
+            'new perspective on': '关于...的新视角',
+            'need to know how to': '需要知道如何',
+            'should practice how to': '应该练习如何',
             'decided to': '决定',
-            'key skill': '关键技能',
-            'biggest challenges': '最大的挑战',
-            'effectively': '有效地',
-            'comprehensive analysis': '全面分析',
             'ability to': '...的能力',
-            'considered': '被认为是'
+            'one of the biggest challenges': '最大的挑战之一',
+            'learning to': '学习',
+            'you must': '你必须',
+            'scientists continue to': '科学家继续',
+            'it is important to': '重要的是',
+            'aims to help': '旨在帮助',
+            'choose to': '选择',
+            'should learn to': '应当学会',
+            'encourage children to': '鼓励孩子',
+            'explanation of the theory': '对理论的解释',
+            'for students to review lessons': '学生复习功课',
+            'results of the experiment': '实验结果',
+            'attitude is essential for success': '态度对成功至关重要',
+            'become increasingly': '变得越来越',
+            'find it': '觉得',
+            'habit of reading': '阅读习惯',
+            'approach can solve': '方法可以解决',
+            'prepare well before the examination': '考前充分准备',
+            'makes our life more': '让我们的生活更',
+            'lifestyle benefits our health': '生活方式有益健康',
+            'account of the event': '对事件的描述',
+            'effectively': '有效地',
+            'the results support this view': '这些结果支持这一观点',
+            'draws a different conclusion': '得出了不同的结论',
+            'make the same mistake': '犯同样的错误',
+            'shows a clear trend': '显示出明显的趋势'
         };
         
         let translation = '';

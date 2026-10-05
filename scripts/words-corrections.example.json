@@ -1,0 +1,7 @@
+{
+  "_说明": "这是格式示例文件（fix-words.js 会忽略 _ 开头的键）。键可以是单词，也可以是 id:编号。请把这里替换成真正来自原始词表的正确释义。",
+  "_用法": "node scripts/fix-words.js --corrections scripts/words-corrections.json --dry-run",
+  "spicy": "adj. 辛辣的；香的，多香料的；下流的",
+  "spend": "vt. 花费；度过；消耗",
+  "analyze": "vt. 分析；解析；分解"
+}
